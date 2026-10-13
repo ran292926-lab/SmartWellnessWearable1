@@ -6,6 +6,7 @@ localhost, created on first run in the instance folder.
 
 import datetime
 import ipaddress
+import ssl
 from pathlib import Path
 
 from cryptography import x509
@@ -50,3 +51,20 @@ def ensure_certificate(folder):
     )
     cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     return str(cert_file), str(key_file)
+
+
+class _HandshakePerConnection(ssl.SSLContext):
+    """Runs the TLS handshake in each request's own thread, not in the server's
+    accept loop, so one browser connection that never finishes the handshake
+    cannot block the whole server."""
+
+    def wrap_socket(self, sock, *args, **kwargs):
+        kwargs["do_handshake_on_connect"] = False
+        return super().wrap_socket(sock, *args, **kwargs)
+
+
+def server_context(folder):
+    cert_file, key_file = ensure_certificate(folder)
+    context = _HandshakePerConnection(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert_file, key_file)
+    return context
