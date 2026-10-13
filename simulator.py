@@ -40,7 +40,7 @@ def send(url, device_id, token, reading_type, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default="http://localhost:5000")
+    parser.add_argument("--url", default="http://localhost:5050")
     parser.add_argument("--device-id", required=True)
     parser.add_argument("--token", required=True)
     parser.add_argument("--interval", type=int, default=300, help="seconds between readings (FR6: 300)")
