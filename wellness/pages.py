@@ -1,6 +1,7 @@
 """Account page: contact ID, device, invitations and data sharing (FR17-FR24)."""
 
 import secrets
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, g, redirect, render_template, request
 
@@ -62,7 +63,8 @@ def home(message=None, error=None):
 def register_device():
     token = crypto.new_token()
     device_id = "DEV-" + secrets.token_hex(4).upper()
-    execute("DELETE FROM devices WHERE user_id = ?", (g.user_id,))
+    if execute("DELETE FROM devices WHERE user_id = ?", (g.user_id,)).rowcount:
+        audit.log("device_deletion", "success", g.user_id)                          # SR21
     execute("INSERT INTO devices (user_id, device_id, token_hash) VALUES (?, ?, ?)",
             (g.user_id, device_id, crypto.hash_token(token)))
     _pending_tokens[g.session_id] = token
@@ -91,8 +93,10 @@ def send_invitation():
 # ---- FR21: accept or decline ----
 
 def _received_invitation(invitation_id):
-    return query_one("SELECT * FROM invitations WHERE id = ? AND contact_user_id = ? AND status = 'pending'",
-                     (invitation_id, g.user_id))
+    # PR5: an invitation older than 7 days can no longer be accepted
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
+    return query_one("SELECT * FROM invitations WHERE id = ? AND contact_user_id = ? AND status = 'pending' "
+                     "AND created_at >= ?", (invitation_id, g.user_id, week_ago))
 
 
 @bp.post("/invitations/<int:invitation_id>/accept")
@@ -112,6 +116,7 @@ def decline(invitation_id):
         audit.log("authorization_failure", "denied", g.user_id)
         return home(error="Invitation not found."), 403
     execute("DELETE FROM invitations WHERE id = ?", (invitation_id,))   # PR6
+    audit.log("invitation_deletion", "declined", g.user_id)                          # SR21
     return redirect("/")
 
 
@@ -125,7 +130,9 @@ def _own_link(invitation_id):
 @bp.post("/contacts/<int:invitation_id>/categories")
 @login_required
 def set_categories(invitation_id):
-    if _own_link(invitation_id) is None:
+    link = _own_link(invitation_id)
+    # PR4: categories can be selected only after the contact has accepted
+    if link is None or link["status"] != "accepted":
         audit.log("authorization_failure", "denied", g.user_id)
         return home(error="Contact not found."), 403
     chosen = request.form.getlist("category")
@@ -142,6 +149,7 @@ def remove_contact(invitation_id):
         audit.log("authorization_failure", "denied", g.user_id)
         return home(error="Contact not found."), 403
     execute("DELETE FROM invitations WHERE id = ?", (invitation_id,))
+    audit.log("contact_deletion", "success", g.user_id)                              # SR21
     return redirect("/")
 
 

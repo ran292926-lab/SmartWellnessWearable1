@@ -13,9 +13,11 @@ bp = Blueprint("account", __name__)
 
 def _page(error=None, message=None, status=200):
     me = query_one("SELECT * FROM users WHERE id = ?", (g.user_id,))
+    audit.log("sensitive_data_access", "success", g.user_id)   # SR21: birth year and weight are shown
     profile = {
         "display_name": me["display_name"],
         "email": me["email"],
+        "contact_id": me["contact_id"],
         "birth_year": crypto.decrypt(me["birth_year_enc"]),
         "weight": crypto.decrypt(me["weight_enc"]),
     }

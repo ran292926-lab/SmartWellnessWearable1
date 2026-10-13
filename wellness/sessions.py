@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
-from flask import g, redirect, request
+from flask import g, render_template, request
 
 from .db import execute, now, query_one
 
@@ -53,12 +53,12 @@ def end_session(response):
 
 
 def login_required(view):
-    """SR11: API requests without a valid session get HTTP 401; pages go to /login."""
+    """SR11: requests without a valid session get HTTP 401 (pages show the login form)."""
     @wraps(view)
     def wrapper(*args, **kwargs):
         if g.user_id is None:
             if request.path.startswith("/api/"):
                 return {"error": "Authentication required"}, 401
-            return redirect("/login")
+            return render_template("login.html", error="Please log in."), 401
         return view(*args, **kwargs)
     return wrapper

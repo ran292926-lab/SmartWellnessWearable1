@@ -5,6 +5,7 @@
 
 <section>
   <h2>Profile</h2>
+  <p>Contact ID: <code>{{ profile.contact_id }}</code></p>
   <form method="post" action="/account/profile">
     <label>Display name <input name="display_name" maxlength="50" value="{{ profile.display_name }}" required></label>
     <label>Birth year <input type="number" name="birth_year" value="{{ profile.birth_year }}" required></label>

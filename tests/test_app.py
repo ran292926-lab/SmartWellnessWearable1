@@ -146,7 +146,7 @@ class AppTest(unittest.TestCase):
         old = (datetime.now(timezone.utc) - timedelta(minutes=31)).isoformat(timespec="seconds")
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("UPDATE sessions SET last_seen = ?", (old,))
-        self.assertEqual(c.get("/").headers["Location"], "/login")                            # SR5
+        self.assertEqual(c.get("/").status_code, 401)                                        # SR5, SR11
 
     def test_lockout_after_5_failures(self):
         c = self.client()
@@ -185,7 +185,7 @@ class AppTest(unittest.TestCase):
 
         self.assertEqual(self.send(c, device_id, token, "heart_rate", 72).status_code, 201)
         self.assertEqual(self.send(c, device_id, "wrong", "heart_rate", 72).status_code, 401)
-        self.assertEqual(self.send(c, "DEV-OTHER", token, "heart_rate", 72).status_code, 401)
+        self.assertEqual(self.send(c, "DEV-00000000", token, "heart_rate", 72).status_code, 401)
         value = bytes(self.sql("SELECT value_enc FROM readings")[0]["value_enc"])
         self.assertNotIn(b"72", value)                                                        # SR17
 
@@ -210,6 +210,22 @@ class AppTest(unittest.TestCase):
                    headers={"Authorization": "Bearer " + token})
         self.assertEqual(r.status_code, 400)                                    # missing timestamp
         self.assertEqual(len(self.sql("SELECT * FROM readings")), 0)
+
+    def test_out_of_range_timestamp_rejected(self):
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        device_id, token = self.device(c)
+        r = self.send(c, device_id, token, "steps", 5, "0001-01-01T00:00:00+03:00")
+        self.assertEqual(r.status_code, 400)                                                  # SR13
+
+    def test_account_page_access_is_logged(self):
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        c.get("/account")
+        events = [r["event_type"] for r in self.sql("SELECT event_type FROM audit_log")]
+        self.assertIn("sensitive_data_access", events)                                        # SR21
 
     def test_duplicate_reading_stored_once(self):
         c = self.client()
@@ -406,6 +422,71 @@ class AppTest(unittest.TestCase):
         from wellness.tls import ensure_certificate
         cert, key = ensure_certificate(self.tmp.name)
         self.assertTrue(os.path.exists(cert) and os.path.exists(key))                        # SR16
+
+    # ---- review fixes ----
+
+    def test_pages_without_session_return_401(self):
+        c = self.client()
+        for path in ("/", "/account"):
+            self.assertEqual(c.get(path).status_code, 401)                                    # SR11
+        self.assertEqual(c.post("/device").status_code, 401)
+
+    def test_categories_cannot_be_set_while_pending(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        a.post("/invitations", data={"contact_id": user_b["contact_id"]})
+        inv = self.sql("SELECT id FROM invitations")[0]["id"]
+        r = a.post(f"/contacts/{inv}/categories", data={"category": ["heart_rate", "steps"]})
+        self.assertEqual(r.status_code, 403)                                                  # PR4
+        b.post(f"/invitations/{inv}/accept")
+        row = self.sql("SELECT * FROM invitations")[0]
+        self.assertEqual((row["share_heart_rate"], row["share_steps"]), (0, 0))               # PR4
+
+    def test_expired_invitation_cannot_be_accepted(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        a.post("/invitations", data={"contact_id": user_b["contact_id"]})
+        old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat(timespec="seconds")
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE invitations SET created_at = ?", (old,))
+        inv = self.sql("SELECT id FROM invitations")[0]["id"]
+        self.assertEqual(b.post(f"/invitations/{inv}/accept").status_code, 403)              # PR5
+
+    def test_odd_device_id_and_huge_steps_do_not_crash(self):
+        c, user = self.new_user("Sara", "sara@example.com")
+        device_id, token = self.device(c)
+        r = c.post("/api/readings", data='{"device_id":"\\ud800","type":"steps","value":1,"timestamp":"2026-01-01T00:00:00Z"}',
+                   content_type="application/json", headers={"Authorization": "Bearer " + token})
+        self.assertEqual(r.status_code, 400)                                                  # SR13, SR19
+        self.assertEqual(self.send(c, device_id, token, "steps", 10 ** 400).status_code, 201)
+        r = c.get(f"/api/wearers/{user['id']}/steps")
+        self.assertEqual(r.status_code, 200)                                                  # FR23, SR19
+
+    def test_deletions_are_logged(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        self.device(a)
+        self.device(a)                                                       # replaces the device
+        inv = self.link(a, b, "noura@example.com")
+        a.post(f"/contacts/{inv}/remove")
+        a.post("/invitations", data={"contact_id": user_b["contact_id"]})
+        inv2 = self.sql("SELECT id FROM invitations")[0]["id"]
+        b.post(f"/invitations/{inv2}/decline")
+        events = {r["event_type"] for r in self.sql("SELECT event_type FROM audit_log")}
+        for e in ("device_deletion", "contact_deletion", "invitation_deletion"):
+            self.assertIn(e, events)                                                          # SR21
+
+    def test_expired_sessions_are_removed(self):
+        from wellness import retention
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        old = (datetime.now(timezone.utc) - timedelta(minutes=31)).isoformat(timespec="seconds")
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE sessions SET last_seen = ?", (old,))
+        with self.app.app_context():
+            retention.apply()
+        self.assertEqual(self.sql("SELECT * FROM sessions"), [])
 
 
 if __name__ == "__main__":

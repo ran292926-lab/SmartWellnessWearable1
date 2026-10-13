@@ -15,6 +15,8 @@ def create_app(overrides=None):
 
     db.init_db(app.config["DATABASE"])
     crypto.load_key(app.config)
+    with app.app_context():
+        retention.apply()                         # PR5, PR12, SR23 at startup
 
     app.before_request(retention.apply_hourly)   # PR5, PR12, SR23
     app.before_request(load_session)

@@ -37,7 +37,8 @@ def daily_summary(wearer_id, category, days=7):
     )
     by_day = defaultdict(list)
     for r in rows:
-        by_day[_riyadh_day(r["recorded_at"])].append(float(decrypt(r["value_enc"])))
+        text = decrypt(r["value_enc"])
+        by_day[_riyadh_day(r["recorded_at"])].append(int(text) if category == "steps" else float(text))
 
     result = []
     for day in sorted(by_day, reverse=True):
@@ -47,7 +48,7 @@ def daily_summary(wearer_id, category, days=7):
                            "max_bpm": max(values)})
         elif category == "steps":
             # FR6: the device sends the day's cumulative count, so the largest value is the total
-            result.append({"day": day, "steps": int(max(values))})
+            result.append({"day": day, "steps": max(values)})
         elif category == "sleep":
             result.append({"day": day, "sleep_hours": values[-1]})
     return result

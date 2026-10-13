@@ -68,7 +68,22 @@ python -m unittest -v
 | Accountability | SR21–SR24 | `audit.py`, `access.py`, `retention.py` |
 | Output encoding | SR25 | templates (automatic HTML encoding) |
 | Privacy | PR1–PR7, PR10–PR14 | `auth.py`, `pages.py`, `access.py`, `account.py`, `retention.py` |
-| Data quality | NFR4, NFR5, NFR7, NFR13 | `schema.sql`, `validation.py`, `data.py`, `config.py` |
+| Data quality | NFR4, NFR5, NFR7, NFR13 (database setting only; alert thresholds come with FR14) | `schema.sql`, `validation.py`, `data.py`, `config.py` |
+
+## Notes and limitations
+
+- **Retention (PR5, PR12, SR23):** the rules run once when the server starts and then at most
+  once an hour, triggered by an incoming request. They are not a separate scheduled job, so if
+  the server receives no requests, expired data stays until the next request.
+- **Privacy notice (PR15, PR16):** not written yet. The registration form already has the
+  consent box (PR1) and records the notice version and time (PR2), but the notice it refers to
+  is not available yet, so the privacy part is not complete in this snapshot.
+- **NFR4:** readings are unique per account, type and timestamp. Each account has one device,
+  so this is the same as per device ID while the device is not replaced.
+- **Device timestamps:** the device chooses the timestamp. No requirement limits it, so a
+  reading dated far in the future would never reach the 90-day limit (PR12). Recorded for review.
+- **CSRF:** not covered by the current requirements and not implemented; recorded for the
+  secure coding review.
 
 ## Not in this snapshot (later weeks)
 

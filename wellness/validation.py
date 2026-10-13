@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 RIYADH = ZoneInfo("Asia/Riyadh")
+DEVICE_ID_PATTERN = re.compile(r"DEV-[0-9A-F]{8}")
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 
@@ -73,6 +74,8 @@ def reading(data):
 
     if not device_id:
         raise ValidationError("device_id is required.")
+    if not isinstance(device_id, str) or not DEVICE_ID_PATTERN.fullmatch(device_id):
+        raise ValidationError("device_id is not valid.")
     if not reading_type:
         raise ValidationError("type is required.")
     if not timestamp:
@@ -86,7 +89,10 @@ def reading(data):
         raise ValidationError("timestamp must be in ISO 8601 format.")
     if recorded.tzinfo is None:
         recorded = recorded.replace(tzinfo=timezone.utc)
-    recorded_at = recorded.astimezone(timezone.utc).isoformat(timespec="seconds")  # NFR5
+    try:
+        recorded_at = recorded.astimezone(timezone.utc).isoformat(timespec="seconds")  # NFR5
+    except OverflowError:
+        raise ValidationError("timestamp is out of range.")
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValidationError("value must be a number.")
