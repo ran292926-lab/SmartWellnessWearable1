@@ -14,6 +14,8 @@ bp = Blueprint("pages", __name__)
 
 # Plain device tokens waiting to be shown once; kept in memory only, never in the database (SR9).
 _pending_tokens = {}
+# One-time success messages shown after a redirect, so a page reload does not resend a form.
+_pending_messages = {}
 
 CATEGORY_NAMES = {
     "heart_rate": "Daily heart-rate summary",
@@ -28,6 +30,7 @@ CATEGORY_NAMES = {
 def home(message=None, error=None):
     # The device token is shown once, on the first page load after it is created.
     new_token = _pending_tokens.pop(g.session_id, None)
+    message = message or _pending_messages.pop(g.session_id, None)
     me = query_one("SELECT * FROM users WHERE id = ?", (g.user_id,))
     device = query_one("SELECT device_id FROM devices WHERE user_id = ?", (g.user_id,))
 
@@ -87,7 +90,8 @@ def send_invitation():
     # PR3: no access until accepted; PR4: all categories unselected
     execute("INSERT INTO invitations (wearer_id, contact_user_id, status, created_at) "
             "VALUES (?, ?, 'pending', ?)", (g.user_id, invited["id"], now()))
-    return home(message="Invitation sent.")
+    _pending_messages[g.session_id] = "Invitation sent."
+    return redirect("/")
 
 
 # ---- FR21: accept or decline ----

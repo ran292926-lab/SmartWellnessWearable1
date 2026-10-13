@@ -488,6 +488,16 @@ class AppTest(unittest.TestCase):
             retention.apply()
         self.assertEqual(self.sql("SELECT * FROM sessions"), [])
 
+    def test_invitation_redirects_and_safe_405_page(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        r = a.post("/invitations", data={"contact_id": user_b["contact_id"]})
+        self.assertEqual(r.status_code, 302)                       # reload does not resend the form
+        self.assertIn("Invitation sent.", a.get("/").get_data(as_text=True))
+        r = a.get("/invitations")
+        self.assertEqual(r.status_code, 405)
+        self.assertNotIn("Traceback", r.get_data(as_text=True))                               # SR19
+
 
 if __name__ == "__main__":
     unittest.main()

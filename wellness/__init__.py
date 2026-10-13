@@ -1,6 +1,7 @@
 """Smart Wellness Wearable web application."""
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
+from werkzeug.exceptions import HTTPException
 
 from . import crypto, db, retention
 from .config import Config
@@ -29,9 +30,12 @@ def create_app(overrides=None):
     app.register_blueprint(account.bp)
 
     # SR19: error messages without stack traces, database details or file paths
-    @app.errorhandler(404)
-    def not_found(_e):
-        return render_template("error.html", message="Page not found."), 404
+    @app.errorhandler(HTTPException)
+    def http_error(e):
+        if request.path.startswith("/api/"):
+            return {"error": e.name}, e.code
+        messages = {404: "Page not found.", 405: "This page cannot be opened directly. Go back to the home page."}
+        return render_template("error.html", message=messages.get(e.code, "The request could not be completed.")), e.code
 
     @app.errorhandler(500)
     def server_error(_e):
