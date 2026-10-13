@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Hello, {{ me.display_name }}</h1>
+
+<section>
+  <h2>My account</h2>
+  <p>Email: {{ me.email }}</p>
+  <p>Contact ID: <code>{{ me.contact_id }}</code> <small>(share it only with people you want to invite you)</small></p>
+</section>
+
+<section>
+  <h2>My device</h2>
+  {% if device %}<p>Device ID: <code>{{ device.device_id }}</code></p>{% else %}<p>No device registered.</p>{% endif %}
+  {% if new_token %}
+  <p class="message">Device token (shown once, copy it now): <code>{{ new_token }}</code></p>
+  {% endif %}
+  <form method="post" action="/device"><button>{{ "Replace device" if device else "Register device" }}</button></form>
+</section>
+
+<section>
+  <h2>Invite a trusted contact</h2>
+  <form method="post" action="/invitations" class="row">
+    <input name="contact_id" placeholder="Contact ID" maxlength="8" required>
+    <button>Send invitation</button>
+  </form>
+</section>
+
+<section>
+  <h2>Invitations I received</h2>
+  {% for inv in received %}
+  <div class="row">
+    <span>{{ inv.display_name }} invited you</span>
+    <form method="post" action="/invitations/{{ inv.id }}/accept" class="inline"><button>Accept</button></form>
+    <form method="post" action="/invitations/{{ inv.id }}/decline" class="inline"><button>Decline</button></form>
+  </div>
+  {% else %}<p>None.</p>{% endfor %}
+</section>
+
+<section>
+  <h2>My trusted contacts</h2>
+  {% for c in my_contacts %}
+  <div class="card">
+    <p><strong>{{ c.display_name }}</strong> — {{ "accepted" if c.status == "accepted" else "pending" }}</p>
+    {% if c.status == "accepted" %}
+    <form method="post" action="/contacts/{{ c.id }}/categories">
+      {% for key, name in categories.items() %}
+      <label class="check"><input type="checkbox" name="category" value="{{ key }}" {{ "checked" if c["share_" + key] }}> {{ name }}</label>
+      {% endfor %}
+      <button>Save</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/contacts/{{ c.id }}/remove" class="inline"><button>Remove</button></form>
+  </div>
+  {% else %}<p>None.</p>{% endfor %}
+</section>
+
+<section>
+  <h2>People sharing with me</h2>
+  {% for w in sharing_with_me %}
+  <p><a href="/wearers/{{ w.id }}">{{ w.display_name }}</a></p>
+  {% else %}<p>None.</p>{% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Wellness Wearable</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <strong>Smart Wellness Wearable</strong>
+    {% if g.user_id %}
+    <form method="post" action="/logout" class="inline"><button>Log out</button></form>
+    {% endif %}
+  </header>
+  <main>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    {% if message %}<p class="message">{{ message }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

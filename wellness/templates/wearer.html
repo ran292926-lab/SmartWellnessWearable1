@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/">&larr; Back</a></p>
+<h1>{{ wearer.display_name }}</h1>
+{% for name, key, days in sections %}
+<section>
+  <h2>{{ name }}</h2>
+  {% if days %}
+  <table>
+    {% for d in days %}
+    <tr>
+      {% if key == "heart_rate" %}<td>{{ d.day }}</td><td>min {{ d.min_bpm|int }} · avg {{ d.avg_bpm }} · max {{ d.max_bpm|int }} bpm</td>
+      {% elif key == "steps" %}<td>{{ d.day }}</td><td>{{ d.steps }} steps</td>
+      {% elif key == "sleep" %}<td>{{ d.day }}</td><td>{{ d.sleep_hours }} hours</td>
+      {% else %}<td>{{ d.time }}</td><td>{{ d.alert }}</td>{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p>No data in the last 7 days.</p>{% endif %}
+</section>
+{% else %}
+<p>{{ wearer.display_name }} has not shared any data category with you.</p>
+{% endfor %}
+{% endblock %}
