@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/">&larr; Back</a></p>
+<h1>My account</h1>
+
+<section>
+  <h2>Profile</h2>
+  <form method="post" action="/account/profile">
+    <label>Display name <input name="display_name" maxlength="50" value="{{ profile.display_name }}" required></label>
+    <label>Birth year <input type="number" name="birth_year" value="{{ profile.birth_year }}" required></label>
+    <label>Weight (kg) <input type="number" name="weight" step="0.1" value="{{ profile.weight }}" required></label>
+    <button>Save profile</button>
+  </form>
+</section>
+
+<section>
+  <h2>Change email</h2>
+  <p>Current email: {{ profile.email }}</p>
+  <form method="post" action="/account/email">
+    <label>New email <input type="email" name="email" required></label>
+    <label>Current password <input type="password" name="current_password" required></label>
+    <button>Change email</button>
+  </form>
+</section>
+
+<section>
+  <h2>Change password</h2>
+  <form method="post" action="/account/password">
+    <label>Current password <input type="password" name="current_password" required></label>
+    <label>New password <input type="password" name="new_password" minlength="8" maxlength="128" required></label>
+    <button>Change password</button>
+  </form>
+</section>
+
+<section>
+  <h2>Delete account</h2>
+  <p>This deletes your account, readings, alerts, device, sessions, invitations and trusted contacts.</p>
+  <form method="post" action="/account/delete">
+    <label class="check"><input type="checkbox" name="confirm" value="yes"> I confirm that I want to delete my account</label>
+    <button class="danger">Delete my account</button>
+  </form>
+</section>
+{% endblock %}

@@ -68,7 +68,8 @@ def register():
 
 @bp.get("/login")
 def login_page():
-    return render_template("login.html", registered="registered" in request.args)
+    return render_template("login.html", registered="registered" in request.args,
+                           deleted="deleted" in request.args)
 
 
 @bp.post("/login")

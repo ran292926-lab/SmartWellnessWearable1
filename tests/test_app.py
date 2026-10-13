@@ -59,7 +59,7 @@ class AppTest(unittest.TestCase):
         return c, self.user(email)
 
     def device(self, c):
-        html = c.post("/device").get_data(as_text=True)
+        html = c.post("/device", follow_redirects=True).get_data(as_text=True)
         token = re.search(r"copy it now\): <code>([^<]+)</code>", html).group(1)
         device_id = re.search(r"Device ID: <code>([^<]+)</code>", html).group(1)
         return device_id, token
@@ -315,6 +315,97 @@ class AppTest(unittest.TestCase):
         html = b.get("/").get_data(as_text=True)
         self.assertNotIn("<script>alert(1)</script>", html)                                   # SR25
         self.assertIn("&lt;script&gt;", html)
+
+    # ---- device token shown once (refresh does not create a new device) ----
+
+    def test_device_token_shown_once(self):
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        device_id, token = self.device(c)
+        html = c.get("/").get_data(as_text=True)
+        self.assertNotIn(token, html)
+        self.assertIn(device_id, html)
+        self.assertEqual(len(self.sql("SELECT * FROM devices")), 1)
+
+    # ---- FR4, SR8 ----
+
+    def test_profile_update_is_validated_and_encrypted(self):
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        r = c.post("/account/profile", data={"display_name": "Sara A", "birth_year": str(THIS_YEAR - 40), "weight": "70"})
+        self.assertEqual(r.status_code, 200)                                                  # FR4
+        u = self.user("sara@example.com")
+        self.assertEqual(u["display_name"], "Sara A")
+        self.assertNotIn(b"70", bytes(u["weight_enc"]))                                       # SR17
+        r = c.post("/account/profile", data={"display_name": "Sara", "birth_year": str(THIS_YEAR - 10), "weight": "70"})
+        self.assertEqual(r.status_code, 400)                                                  # SR14
+
+    def test_email_and_password_change_need_current_password(self):
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        r = c.post("/account/email", data={"email": "new@example.com", "current_password": "wrong-password"})
+        self.assertEqual(r.status_code, 403)                                                  # SR8
+        r = c.post("/account/password", data={"new_password": "new-password-1", "current_password": "wrong-password"})
+        self.assertEqual(r.status_code, 403)                                                  # SR8
+
+        self.assertEqual(c.post("/account/email", data={"email": "new@example.com",
+                         "current_password": "correct-horse"}).status_code, 200)              # FR4
+        self.assertEqual(c.post("/account/password", data={"new_password": "new-password-1",
+                         "current_password": "correct-horse"}).status_code, 200)              # FR4
+        self.assertEqual(self.login(self.client(), "new@example.com", "new-password-1").status_code, 302)
+
+    # ---- FR5, PR13, PR14 ----
+
+    def test_account_deletion(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        device_id, token = self.device(a)
+        self.send(a, device_id, token, "steps", 100)
+        self.link(a, b, "noura@example.com")
+
+        self.assertEqual(a.post("/account/delete", data={}).status_code, 400)                # needs confirmation
+        a.post("/account/delete", data={"confirm": "yes"})                                    # FR5
+
+        for table in ("users WHERE id = ?", "readings WHERE user_id = ?", "devices WHERE user_id = ?",
+                      "sessions WHERE user_id = ?"):
+            self.assertEqual(self.sql("SELECT * FROM " + table, (user_a["id"],)), [])         # PR13
+        self.assertEqual(self.sql("SELECT * FROM invitations"), [])                           # PR13
+
+        refs = {r["user_id"] for r in self.sql("SELECT user_id FROM audit_log")}
+        self.assertNotIn(str(user_a["id"]), refs)                                              # PR14
+        uuids = [r for r in refs if r and len(r) == 36]
+        self.assertTrue(uuids and all(r[14] == "4" for r in uuids))                           # version 4 UUID
+
+    # ---- PR5, PR12, SR23 ----
+
+    def test_retention_rules(self):
+        from wellness import retention
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        device_id, token = self.device(a)
+        old = lambda days: (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+        self.send(a, device_id, token, "steps", 100, old(91))
+        self.send(a, device_id, token, "steps", 200, old(1))
+        a.post("/invitations", data={"contact_id": user_b["contact_id"]})
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE invitations SET created_at = ?", (old(8),))
+            conn.execute("INSERT INTO audit_log (event_type, outcome, user_id, created_at) VALUES ('login', 'success', '1', ?)", (old(366),))
+
+        with self.app.app_context():
+            retention.apply()
+        self.assertEqual(len(self.sql("SELECT * FROM readings")), 1)                          # PR12
+        self.assertEqual(self.sql("SELECT * FROM invitations"), [])                           # PR5
+        self.assertEqual(self.sql("SELECT * FROM audit_log WHERE created_at < ?", (old(365),)), [])  # SR23
+
+    # ---- SR16 ----
+
+    def test_tls_certificate_created(self):
+        from wellness.tls import ensure_certificate
+        cert, key = ensure_certificate(self.tmp.name)
+        self.assertTrue(os.path.exists(cert) and os.path.exists(key))                        # SR16
 
 
 if __name__ == "__main__":

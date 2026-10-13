@@ -11,13 +11,19 @@ Usage:
 import argparse
 import json
 import random
+import ssl
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 RIYADH = ZoneInfo("Asia/Riyadh")
+
+# SR16: trust the server's local TLS certificate
+CERT = Path(__file__).resolve().parent / "instance" / "cert.pem"
+TLS = ssl.create_default_context(cafile=str(CERT)) if CERT.exists() else None
 
 
 def send(url, device_id, token, reading_type, value):
@@ -32,7 +38,7 @@ def send(url, device_id, token, reading_type, value):
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + token},
     )
     try:
-        with urllib.request.urlopen(request) as response:
+        with urllib.request.urlopen(request, context=TLS if url.startswith("https") else None) as response:
             print(reading_type, value, "->", response.status, response.read().decode().strip())
     except urllib.error.HTTPError as e:
         print(reading_type, value, "->", e.code, e.read().decode().strip())
@@ -40,7 +46,7 @@ def send(url, device_id, token, reading_type, value):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default="http://localhost:5050")
+    parser.add_argument("--url", default="https://localhost:5050")
     parser.add_argument("--device-id", required=True)
     parser.add_argument("--token", required=True)
     parser.add_argument("--interval", type=int, default=300, help="seconds between readings (FR6: 300)")

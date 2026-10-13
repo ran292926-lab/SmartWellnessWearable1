@@ -9,8 +9,12 @@ All data is synthetic.
 
 ```bash
 pip install -r requirements.txt
-python app.py                      # open http://localhost:5050/register
+python app.py                      # open https://localhost:5050/register
 ```
+
+The server uses HTTPS with a self-signed certificate for localhost (SR16), created in
+`instance/` on first run. The browser shows a warning the first time: choose
+**Advanced → Proceed to localhost**.
 
 Simulated wearable (after you register a device on the home page):
 
@@ -43,6 +47,9 @@ python -m unittest -v
 | `wellness/api.py` | Device readings API and wearer data API |
 | `wellness/data.py` | Daily summaries |
 | `wellness/audit.py` | Audit log |
+| `wellness/account.py` | Profile changes and account deletion |
+| `wellness/retention.py` | Retention rules |
+| `wellness/tls.py` | Local TLS certificate |
 | `wellness/templates/` | HTML pages |
 | `tests/test_app.py` | Tests |
 
@@ -50,23 +57,20 @@ python -m unittest -v
 
 | Area | Requirements | Where |
 |---|---|---|
-| Accounts | FR1, FR2, FR3 | `auth.py` |
+| Accounts | FR1, FR2, FR3, FR4, FR5 | `auth.py`, `account.py` |
 | Contact ID and invitations | FR17, FR18, FR19, FR20, FR21 | `auth.py`, `pages.py` |
 | Data sharing | FR22, FR23, FR24 | `pages.py`, `api.py`, `data.py` |
 | Device readings | FR6, FR7 | `api.py`, `simulator.py` |
-| Authentication and sessions | SR1–SR7, SR9 | `crypto.py`, `sessions.py`, `auth.py`, `api.py` |
+| Authentication and sessions | SR1–SR9 | `crypto.py`, `sessions.py`, `auth.py`, `account.py`, `api.py` |
 | Authorization | SR10, SR11, SR12 | `access.py`, `sessions.py` |
 | Input validation | SR2, SR13, SR14, SR15 | `validation.py`, `db.py` |
-| Data protection | SR17, SR18, SR19, SR20 | `crypto.py`, `config.py`, `__init__.py` |
-| Accountability | SR21, SR22, SR24 | `audit.py`, `access.py` |
+| Data protection | SR16, SR17, SR18, SR19, SR20 | `tls.py`, `crypto.py`, `config.py`, `__init__.py` |
+| Accountability | SR21–SR24 | `audit.py`, `access.py`, `retention.py` |
 | Output encoding | SR25 | templates (automatic HTML encoding) |
-| Privacy | PR1, PR2, PR3, PR4, PR6, PR7, PR10, PR11 | `auth.py`, `pages.py`, `access.py` |
+| Privacy | PR1–PR7, PR10–PR14 | `auth.py`, `pages.py`, `access.py`, `account.py`, `retention.py` |
 | Data quality | NFR4, NFR5, NFR7, NFR13 | `schema.sql`, `validation.py`, `data.py`, `config.py` |
 
 ## Not in this snapshot (later weeks)
 
 - Dashboard, charts, calories and alerts: FR8–FR16, NFR1, NFR6, NFR8, NFR9
-- Profile changes and account deletion: FR4, FR5, SR8, PR13, PR14
-- Retention: PR5, PR12, SR23
 - Privacy notice and user rights: PR15–PR19
-- TLS: SR16 (the server runs on plain HTTP on localhost for development)

@@ -11,6 +11,9 @@ from .sessions import login_required
 
 bp = Blueprint("pages", __name__)
 
+# Plain device tokens waiting to be shown once; kept in memory only, never in the database (SR9).
+_pending_tokens = {}
+
 CATEGORY_NAMES = {
     "heart_rate": "Daily heart-rate summary",
     "steps": "Daily step summary",
@@ -21,7 +24,9 @@ CATEGORY_NAMES = {
 
 @bp.get("/")
 @login_required
-def home(new_token=None, message=None, error=None):
+def home(message=None, error=None):
+    # The device token is shown once, on the first page load after it is created.
+    new_token = _pending_tokens.pop(g.session_id, None)
     me = query_one("SELECT * FROM users WHERE id = ?", (g.user_id,))
     device = query_one("SELECT device_id FROM devices WHERE user_id = ?", (g.user_id,))
 
@@ -60,8 +65,8 @@ def register_device():
     execute("DELETE FROM devices WHERE user_id = ?", (g.user_id,))
     execute("INSERT INTO devices (user_id, device_id, token_hash) VALUES (?, ?, ?)",
             (g.user_id, device_id, crypto.hash_token(token)))
-    # The token is shown once and never stored in plain form.
-    return home(new_token=token)
+    _pending_tokens[g.session_id] = token
+    return redirect("/")
 
 
 # ---- FR19: send an invitation by contact ID ----
