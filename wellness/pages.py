@@ -166,7 +166,7 @@ def remove_contact(invitation_id):
 def view_wearer(wearer_id):
     if not access.can_read(g.user_id, wearer_id, "display_name"):
         audit.log("authorization_failure", "denied", g.user_id)
-        return render_template("error.html", message="You do not have access to this page."), 403
+        return render_template("error.html", detail="You do not have access to this page."), 403
 
     wearer = query_one("SELECT display_name FROM users WHERE id = ?", (wearer_id,))
     sections = []

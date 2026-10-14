@@ -498,6 +498,7 @@ class AppTest(unittest.TestCase):
         r = a.get("/invitations")
         self.assertEqual(r.status_code, 405)
         self.assertNotIn("Traceback", r.get_data(as_text=True))                               # SR19
+        self.assertEqual(r.get_data(as_text=True).count("cannot be opened directly"), 1)   # message shown once
 
     def test_existing_key_file_is_made_owner_only(self):
         from wellness import crypto

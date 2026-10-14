@@ -35,10 +35,10 @@ def create_app(overrides=None):
         if request.path.startswith("/api/"):
             return {"error": e.name}, e.code
         messages = {404: "Page not found.", 405: "This page cannot be opened directly. Go back to the home page."}
-        return render_template("error.html", message=messages.get(e.code, "The request could not be completed.")), e.code
+        return render_template("error.html", detail=messages.get(e.code, "The request could not be completed.")), e.code
 
     @app.errorhandler(500)
     def server_error(_e):
-        return render_template("error.html", message="An unexpected error occurred."), 500
+        return render_template("error.html", detail="An unexpected error occurred."), 500
 
     return app
