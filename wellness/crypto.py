@@ -41,7 +41,7 @@ def load_key(config):
         if not key_file.exists():
             key_file.parent.mkdir(parents=True, exist_ok=True)
             key_file.write_bytes(base64.b64encode(AESGCM.generate_key(bit_length=256)))
-            key_file.chmod(0o600)   # readable by the owner only
+        key_file.chmod(0o600)   # readable by the owner only, also for key files created earlier
         key = base64.b64decode(key_file.read_bytes())
     _aes = AESGCM(key)
 

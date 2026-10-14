@@ -8,10 +8,14 @@ from . import audit, crypto, validation
 from .db import execute, query_one
 from .sessions import login_required
 
+# One-time success messages shown after a redirect, so a page reload does not resend a form.
+_pending_messages = {}
+
 bp = Blueprint("account", __name__)
 
 
 def _page(error=None, message=None, status=200):
+    message = message or _pending_messages.pop(g.session_id, None)
     me = query_one("SELECT * FROM users WHERE id = ?", (g.user_id,))
     audit.log("sensitive_data_access", "success", g.user_id)   # SR21: birth year and weight are shown
     profile = {
@@ -43,7 +47,8 @@ def update_profile():
         return _page(error=str(e), status=400)
     execute("UPDATE users SET display_name = ?, birth_year_enc = ?, weight_enc = ? WHERE id = ?",
             (display_name, crypto.encrypt(birth_year), crypto.encrypt(weight), g.user_id))  # SR17
-    return _page(message="Profile updated.")
+    _pending_messages[g.session_id] = "Profile updated."
+    return redirect("/account")
 
 
 # ---- FR4 + SR8: change email or password after re-entering the current password ----
@@ -65,7 +70,8 @@ def change_email():
     if query_one("SELECT 1 FROM users WHERE email = ? AND id != ?", (email, g.user_id)):
         return _page(error="This email is already registered.", status=400)
     execute("UPDATE users SET email = ? WHERE id = ?", (email, g.user_id))
-    return _page(message="Email updated.")
+    _pending_messages[g.session_id] = "Email updated."
+    return redirect("/account")
 
 
 @bp.post("/account/password")
@@ -79,7 +85,8 @@ def change_password():
         return _page(error=str(e), status=400)
     execute("UPDATE users SET password_hash = ? WHERE id = ?",
             (crypto.hash_password(password), g.user_id))                           # SR1
-    return _page(message="Password updated.")
+    _pending_messages[g.session_id] = "Password updated."
+    return redirect("/account")
 
 
 # ---- FR5, PR13, PR14: delete the account ----

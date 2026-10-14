@@ -351,7 +351,8 @@ class AppTest(unittest.TestCase):
         self.register(c)
         self.login(c)
         r = c.post("/account/profile", data={"display_name": "Sara A", "birth_year": str(THIS_YEAR - 40), "weight": "70"})
-        self.assertEqual(r.status_code, 200)                                                  # FR4
+        self.assertEqual(r.status_code, 302)                                                  # FR4
+        self.assertIn("Profile updated.", c.get("/account").get_data(as_text=True))
         u = self.user("sara@example.com")
         self.assertEqual(u["display_name"], "Sara A")
         self.assertNotIn(b"70", bytes(u["weight_enc"]))                                       # SR17
@@ -368,9 +369,9 @@ class AppTest(unittest.TestCase):
         self.assertEqual(r.status_code, 403)                                                  # SR8
 
         self.assertEqual(c.post("/account/email", data={"email": "new@example.com",
-                         "current_password": "correct-horse"}).status_code, 200)              # FR4
+                         "current_password": "correct-horse"}).status_code, 302)              # FR4
         self.assertEqual(c.post("/account/password", data={"new_password": "new-password-1",
-                         "current_password": "correct-horse"}).status_code, 200)              # FR4
+                         "current_password": "correct-horse"}).status_code, 302)              # FR4
         self.assertEqual(self.login(self.client(), "new@example.com", "new-password-1").status_code, 302)
 
     # ---- FR5, PR13, PR14 ----
@@ -497,6 +498,29 @@ class AppTest(unittest.TestCase):
         r = a.get("/invitations")
         self.assertEqual(r.status_code, 405)
         self.assertNotIn("Traceback", r.get_data(as_text=True))                               # SR19
+
+    def test_existing_key_file_is_made_owner_only(self):
+        from wellness import crypto
+        key_file = os.path.join(self.tmp.name, "data.key")
+        with open(key_file, "wb") as f:
+            f.write(base64.b64encode(os.urandom(32)))
+        os.chmod(key_file, 0o644)
+        crypto.load_key({"DATA_KEY": None, "KEY_FILE": key_file})
+        self.assertEqual(os.stat(key_file).st_mode & 0o777, 0o600)                            # SR18
+
+    def test_sharing_summary_edit_and_saved_message(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        inv = self.link(a, b, "noura@example.com")
+        html = a.get("/").get_data(as_text=True)
+        self.assertIn("Shared: nothing yet", html)
+        self.assertNotIn('name="category"', html)                  # checkboxes only in edit mode
+        self.assertIn('name="category"', a.get(f"/?edit={inv}").get_data(as_text=True))
+        r = a.post(f"/contacts/{inv}/categories", data={"category": ["steps"]})
+        self.assertEqual(r.status_code, 302)
+        html = a.get("/").get_data(as_text=True)
+        self.assertIn("Sharing settings saved.", html)
+        self.assertIn("Shared: Daily step summary", html)
 
 
 if __name__ == "__main__":

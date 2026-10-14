@@ -56,6 +56,7 @@ def home(message=None, error=None):
         "home.html", me=me, device=device, received=received, my_contacts=my_contacts,
         sharing_with_me=sharing_with_me, categories=CATEGORY_NAMES,
         new_token=new_token, message=message, error=error,
+        editing=request.args.get("edit", type=int),
     )
 
 
@@ -143,6 +144,7 @@ def set_categories(invitation_id):
     values = [1 if c in chosen else 0 for c in access.CATEGORIES]
     execute("UPDATE invitations SET share_heart_rate = ?, share_steps = ?, share_sleep = ?, "
             "share_alerts = ? WHERE id = ?", (*values, invitation_id))
+    _pending_messages[g.session_id] = "Sharing settings saved."
     return redirect("/")
 
 

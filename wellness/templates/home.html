@@ -42,15 +42,24 @@
   {% for c in my_contacts %}
   <div class="card">
     <p><strong>{{ c.display_name }}</strong> — {{ "accepted" if c.status == "accepted" else "pending" }}</p>
-    {% if c.status == "accepted" %}
+    {% if c.status == "accepted" and editing == c.id %}
     <form method="post" action="/contacts/{{ c.id }}/categories">
       {% for key, name in categories.items() %}
       <label class="check"><input type="checkbox" name="category" value="{{ key }}" {{ "checked" if c["share_" + key] }}> {{ name }}</label>
       {% endfor %}
-      <button>Save</button>
+      <div class="row"><button>Save</button> <a href="/">Cancel</a></div>
     </form>
+    {% else %}
+      {% if c.status == "accepted" %}
+      {% set shared = [] %}
+      {% for key, name in categories.items() %}{% if c["share_" + key] %}{% set _ = shared.append(name) %}{% endif %}{% endfor %}
+      <p>Shared: {{ shared | join(", ") if shared else "nothing yet" }}</p>
+      {% endif %}
+      <div class="row">
+        {% if c.status == "accepted" %}<a class="button" href="/?edit={{ c.id }}">Edit</a>{% endif %}
+        <form method="post" action="/contacts/{{ c.id }}/remove" class="inline"><button>Remove</button></form>
+      </div>
     {% endif %}
-    <form method="post" action="/contacts/{{ c.id }}/remove" class="inline"><button>Remove</button></form>
   </div>
   {% else %}<p>None.</p>{% endfor %}
 </section>
