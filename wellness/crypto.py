@@ -55,7 +55,7 @@ def decrypt(blob):
     return _aes.decrypt(blob[:12], blob[12:], None).decode()
 
 
-# ---- SR9: device token stored on the server only as a hash ----
+# ---- SR9, SR28: device token stored on the server only as a hash ----
 
 def new_token():
     return secrets.token_urlsafe(32)

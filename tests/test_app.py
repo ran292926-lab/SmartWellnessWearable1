@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from wellness import create_app
+from wellness import create_app, ratelimit
 
 THIS_YEAR = datetime.now(ZoneInfo("Asia/Riyadh")).year
 
@@ -23,7 +23,9 @@ class AppTest(unittest.TestCase):
             "TESTING": True,
             "DATABASE": self.db_path,
             "DATA_KEY": base64.b64encode(os.urandom(32)).decode(),
+            "RATE_LIMIT": 100000,   # the SR27 test sets its own limit
         })
+        ratelimit.reset()
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -522,6 +524,54 @@ class AppTest(unittest.TestCase):
         html = a.get("/").get_data(as_text=True)
         self.assertIn("Sharing settings saved.", html)
         self.assertIn("Shared: Daily step summary", html)
+
+    # ---- Requirements added in Phase 2 ----
+
+    def test_password_change_ends_other_sessions(self):                          # SR26
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        other = self.client()
+        self.login(other, email="sara@example.com")
+        self.assertEqual(other.get("/").status_code, 200)
+        r = a.post("/account/password", data={"current_password": "correct-horse",
+                                              "new_password": "new-password-1"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(other.get("/").status_code, 401)        # other session ended
+        self.assertEqual(a.get("/").status_code, 200)            # current session kept
+
+    def test_rate_limit_returns_429(self):                                        # SR27
+        self.app.config["RATE_LIMIT"] = 60
+        c = self.client()
+        codes = [c.get("/login").status_code for _ in range(61)]
+        self.assertEqual(codes[:60], [200] * 60)
+        self.assertEqual(codes[60], 429)
+        self.assertEqual(c.get("/api/wearers/1/steps").status_code, 429)
+        for row in self.sql("SELECT * FROM audit_log"):            # PR8: no IP address stored
+            self.assertNotIn("127.0.0.1", " ".join(str(v) for v in row))
+
+    def test_sharing_and_account_changes_are_logged(self):                       # SR29
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        inv = self.link(a, b, "noura@example.com")
+        a.post(f"/contacts/{inv}/categories", data={"category": ["steps"]})
+        a.post("/account/email", data={"current_password": "correct-horse", "email": "sara2@example.com"})
+        a.post("/account/password", data={"current_password": "correct-horse", "new_password": "new-password-1"})
+        events = {(r["event_type"], r["outcome"]) for r in self.sql("SELECT * FROM audit_log")}
+        for e in [("invitation_sent", "success"), ("invitation_response", "accepted"),
+                  ("sharing_change", "success"), ("email_change", "success"),
+                  ("password_change", "success")]:
+            self.assertIn(e, events)
+
+    def test_same_confirmation_for_every_invitation(self):                       # SR30
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        pages = []
+        for contact_id in (user_b["contact_id"], "ZZZZZZZZ", user_b["contact_id"], user_a["contact_id"]):
+            r = a.post("/invitations", data={"contact_id": contact_id})
+            self.assertEqual(r.status_code, 302)
+            html = a.get("/").get_data(as_text=True)
+            pages.append("Invitation sent." in html and "No other user" not in html and "already" not in html)
+        self.assertEqual(pages, [True] * 4)
+        self.assertEqual(len(self.sql("SELECT * FROM invitations")), 1)
 
 
 if __name__ == "__main__":

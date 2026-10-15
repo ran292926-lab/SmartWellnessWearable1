@@ -70,6 +70,7 @@ def change_email():
     if query_one("SELECT 1 FROM users WHERE email = ? AND id != ?", (email, g.user_id)):
         return _page(error="This email is already registered.", status=400)
     execute("UPDATE users SET email = ? WHERE id = ?", (email, g.user_id))
+    audit.log("email_change", "success", g.user_id)                                   # SR29
     _pending_messages[g.session_id] = "Email updated."
     return redirect("/account")
 
@@ -85,6 +86,9 @@ def change_password():
         return _page(error=str(e), status=400)
     execute("UPDATE users SET password_hash = ? WHERE id = ?",
             (crypto.hash_password(password), g.user_id))                           # SR1
+    # SR26: end every other session of this account; the current session stays
+    execute("DELETE FROM sessions WHERE user_id = ? AND id != ?", (g.user_id, g.session_id))
+    audit.log("password_change", "success", g.user_id)                                # SR29
     _pending_messages[g.session_id] = "Password updated."
     return redirect("/account")
 

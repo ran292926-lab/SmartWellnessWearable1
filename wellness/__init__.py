@@ -3,7 +3,7 @@
 from flask import Flask, render_template, request
 from werkzeug.exceptions import HTTPException
 
-from . import crypto, db, retention
+from . import crypto, db, ratelimit, retention
 from .config import Config
 from .sessions import load_session
 
@@ -19,6 +19,7 @@ def create_app(overrides=None):
     with app.app_context():
         retention.apply()                         # PR5, PR12, SR23 at startup
 
+    app.before_request(ratelimit.check)           # SR27
     app.before_request(retention.apply_hourly)   # PR5, PR12, SR23
     app.before_request(load_session)
     app.teardown_appcontext(db.close_db)

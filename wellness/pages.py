@@ -12,7 +12,7 @@ from .sessions import login_required
 
 bp = Blueprint("pages", __name__)
 
-# Plain device tokens waiting to be shown once; kept in memory only, never in the database (SR9).
+# Plain device tokens waiting to be shown once; kept in memory only, never in the database (SR28).
 _pending_tokens = {}
 # One-time success messages shown after a redirect, so a page reload does not resend a form.
 _pending_messages = {}
@@ -82,15 +82,16 @@ def register_device():
 def send_invitation():
     contact_id = (request.form.get("contact_id") or "").strip().upper()
     invited = query_one("SELECT id FROM users WHERE contact_id = ?", (contact_id,))
-    if invited is None or invited["id"] == g.user_id:
-        return home(error="No other user has this contact ID."), 400
-    if query_one("SELECT 1 FROM invitations WHERE wearer_id = ? AND contact_user_id = ?",
-                 (g.user_id, invited["id"])):
-        return home(error="You have already invited this user."), 400
-
-    # PR3: no access until accepted; PR4: all categories unselected
-    execute("INSERT INTO invitations (wearer_id, contact_user_id, status, created_at) "
-            "VALUES (?, ?, 'pending', ?)", (g.user_id, invited["id"], now()))
+    if (invited is not None and invited["id"] != g.user_id and not query_one(
+            "SELECT 1 FROM invitations WHERE wearer_id = ? AND contact_user_id = ?",
+            (g.user_id, invited["id"]))):
+        # PR3: no access until accepted; PR4: all categories unselected
+        execute("INSERT INTO invitations (wearer_id, contact_user_id, status, created_at) "
+                "VALUES (?, ?, 'pending', ?)", (g.user_id, invited["id"], now()))
+        audit.log("invitation_sent", "success", g.user_id)                          # SR29
+    else:
+        audit.log("invitation_sent", "not_sent", g.user_id)                         # SR29
+    # SR30: the same confirmation whether or not the contact ID belongs to an account
     _pending_messages[g.session_id] = "Invitation sent."
     return redirect("/")
 
@@ -111,6 +112,7 @@ def accept(invitation_id):
         audit.log("authorization_failure", "denied", g.user_id)
         return home(error="Invitation not found."), 403
     execute("UPDATE invitations SET status = 'accepted' WHERE id = ?", (invitation_id,))
+    audit.log("invitation_response", "accepted", g.user_id)                         # SR29
     return redirect("/")
 
 
@@ -121,6 +123,7 @@ def decline(invitation_id):
         audit.log("authorization_failure", "denied", g.user_id)
         return home(error="Invitation not found."), 403
     execute("DELETE FROM invitations WHERE id = ?", (invitation_id,))   # PR6
+    audit.log("invitation_response", "declined", g.user_id)                         # SR29
     audit.log("invitation_deletion", "declined", g.user_id)                          # SR21
     return redirect("/")
 
@@ -144,6 +147,7 @@ def set_categories(invitation_id):
     values = [1 if c in chosen else 0 for c in access.CATEGORIES]
     execute("UPDATE invitations SET share_heart_rate = ?, share_steps = ?, share_sleep = ?, "
             "share_alerts = ? WHERE id = ?", (*values, invitation_id))
+    audit.log("sharing_change", "success", g.user_id)                               # SR29
     _pending_messages[g.session_id] = "Sharing settings saved."
     return redirect("/")
 

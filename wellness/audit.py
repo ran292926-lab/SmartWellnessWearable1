@@ -2,7 +2,9 @@
 sensitive-data access with event type, timestamp, outcome and user ID.
 
 SR22: entries hold no password, session token or health value.
-SR24: no route in the application modifies or deletes these entries.
+SR24: no user can modify or delete these entries. The only changes are made by the
+application itself: deletion after 12 months (SR23, retention.py) and replacing the
+user ID with a random ID when an account is deleted (PR14, account.py).
 """
 
 from .db import execute, now

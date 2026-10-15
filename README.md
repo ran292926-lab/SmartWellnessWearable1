@@ -50,6 +50,7 @@ python -m unittest -v
 | `wellness/account.py` | Profile changes and account deletion |
 | `wellness/retention.py` | Retention rules |
 | `wellness/tls.py` | Local TLS certificate |
+| `wellness/ratelimit.py` | Request limit per client IP address, in memory only |
 | `wellness/templates/` | HTML pages |
 | `tests/test_app.py` | Tests |
 
@@ -65,8 +66,9 @@ python -m unittest -v
 | Authorization | SR10, SR11, SR12 | `access.py`, `sessions.py` |
 | Input validation | SR2, SR13, SR14, SR15 | `validation.py`, `db.py` |
 | Data protection | SR16, SR17, SR18, SR19, SR20 | `tls.py`, `crypto.py`, `config.py`, `__init__.py` |
-| Accountability | SR21–SR24 | `audit.py`, `access.py`, `retention.py` |
+| Accountability | SR21–SR24, SR29 | `audit.py`, `access.py`, `retention.py` |
 | Output encoding | SR25 | templates (automatic HTML encoding) |
+| Added in Phase 2 | SR26, SR27, SR28, SR29, SR30, PR20 | `account.py`, `ratelimit.py`, `crypto.py`, `pages.py`, `home.html` |
 | Privacy | PR1–PR7, PR10–PR14 | `auth.py`, `pages.py`, `access.py`, `account.py`, `retention.py` |
 | Data quality | NFR4, NFR5, NFR7, NFR13 (database setting only; alert thresholds come with FR14) | `schema.sql`, `validation.py`, `data.py`, `config.py` |
 
@@ -82,6 +84,11 @@ python -m unittest -v
   so this is the same as per device ID while the device is not replaced.
 - **Device timestamps:** the device chooses the timestamp. No requirement limits it, so a
   reading dated far in the future would never reach the 90-day limit (PR12). Recorded for review.
+- **Audit log (SR24):** no user can change or delete log entries. The application itself
+  changes them in two defined cases only: entries older than 12 months are deleted (SR23), and
+  the user ID is replaced with a random ID when an account is deleted (PR14).
+- **Rate limit (SR27):** the per-IP counts are kept in memory only and are never stored or
+  logged (PR8), so they reset when the server restarts.
 - **CSRF:** not covered by the current requirements and not implemented; recorded for the
   secure coding review.
 
