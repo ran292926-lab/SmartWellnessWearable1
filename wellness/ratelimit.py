@@ -1,7 +1,7 @@
 """SR27: HTTP 429 for more than 60 requests per minute from the same client IP address.
 
-The counts are kept in memory only and are never written to the database or a
-log, so client IP addresses are not stored (PR8).
+Client IP addresses and request times are kept in server memory only. They are
+never written to the database or logs, and they are cleared when the server restarts.
 """
 
 import time

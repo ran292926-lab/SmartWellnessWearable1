@@ -28,7 +28,7 @@ def apply():
     deleted += execute("DELETE FROM alerts WHERE created_at < ?", (_ago(days=90),)).rowcount
     # Data Map: session identifiers end after 30 idle minutes (SR5)
     execute("DELETE FROM sessions WHERE last_seen < ?", (_ago(minutes=30),))
-    # SR23: audit log entries 12 months after the event time
+    # SR23: audit log entries 365 days after the event time
     deleted += execute("DELETE FROM audit_log WHERE created_at < ?", (_ago(days=365),)).rowcount
     if deleted:
         audit.log("retention_deletion", "success")                                   # SR21
