@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <p class="eyebrow">Wearable</p>
+  <h1>My device</h1>
+  <p class="lead">The simulated wearable sends readings to your account with its secret token.</p>
+</div>
+<div class="narrow">
+<section>
+  <h2><span class="tile t-blue"><svg width="18" height="18"><use href="#i-watch"/></svg></span>My device</h2>
+  <div class="device">
+    <div class="watch {{ 'on' if device else '' }}"><svg width="44" height="44"><use href="#i-watch"/></svg></div>
+    <div>
+      {% if device %}<p>Device ID: <code>{{ device.device_id }}</code></p><p class="status-dot">Registered</p>{% else %}<p>No device registered.</p><p class="hint">Register your wearable to start sending readings.</p>{% endif %}
+    </div>
+  </div>
+  {% if new_token %}
+  <p class="message token">Device token (shown once, copy it now): <code>{{ new_token }}</code> <button type="button" class="copy" data-copy="{{ new_token }}">Copy</button></p>
+  {% endif %}
+  <form method="post" action="/device"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}"><button>{{ "Replace device" if device else "Register device" }}</button></form>
+</section>
+</div>
+{% endblock %}

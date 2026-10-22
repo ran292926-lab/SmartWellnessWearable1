@@ -1,73 +1,76 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block content %}
-<h1>Hello, {{ me.display_name }}</h1>
+<div class="hero">
+  <div class="hero-text">
+    <p class="eyebrow">Your wellness space <span class="clock" data-clock></span></p>
+    <h1><span data-greet>Hello</span>, {{ me.display_name }}</h1>
+    <p class="lead">Here is how your body is doing today.</p>
+  </div>
+  <div class="hero-art" aria-hidden="true" data-tilt>
+    <span class="halo"></span>
+    <svg class="watch-art" width="170" height="200"><use href="#art-watch"/></svg>
+    <span class="float f1 cat-heart_rate"><svg width="20" height="20"><use href="#i-heart_rate"/></svg></span>
+    <span class="float f2 cat-steps"><svg width="20" height="20"><use href="#i-steps"/></svg></span>
+    <span class="float f3 cat-sleep"><svg width="20" height="20"><use href="#i-sleep"/></svg></span>
+    <span class="float f4 cat-alerts"><svg width="18" height="18"><use href="#i-alerts"/></svg></span>
+  </div>
+</div>
 
+<div class="stats">
+  <a class="stat cat-heart_rate" href="/trends">
+    <span class="stat-ico"><svg width="22" height="22"><use href="#i-heart_rate"/></svg></span>
+    {% if dash.latest_hr %}<strong data-count="{{ dash.latest_hr.bpm }}">{{ dash.latest_hr.bpm }}</strong><span class="unit">bpm</span>{% else %}<strong>–</strong>{% endif %}
+    <p>Current heart rate</p>
+  </a>
+  <a class="stat cat-steps" href="/trends">
+    <span class="stat-ico"><svg width="22" height="22"><use href="#i-steps"/></svg></span>
+    {% if dash.steps is not none %}<strong data-count="{{ dash.steps }}">{{ "{:,}".format(dash.steps) }}</strong><span class="unit">steps</span>{% else %}<strong>–</strong>{% endif %}
+    <p>Steps today</p>
+  </a>
+  <a class="stat cat-sleep" href="/trends">
+    <span class="stat-ico"><svg width="22" height="22"><use href="#i-sleep"/></svg></span>
+    {% if dash.sleep_hours is not none %}<strong class="hm">{{ m.hm(dash.sleep_hours) }}</strong>{% else %}<strong>–</strong>{% endif %}
+    <p>Sleep last night</p>
+  </a>
+  <a class="stat cat-calories" href="/trends">
+    <span class="stat-ico"><svg width="22" height="22"><use href="#i-flame"/></svg></span>
+    {% if dash.calories is not none %}<strong data-count="{{ dash.calories }}">{{ dash.calories }}</strong><span class="unit">kcal</span>{% else %}<strong>–</strong>{% endif %}
+    <p>Calories today</p>
+  </a>
+</div>
+<p class="details-link"><a class="more" href="/trends">See health details and 7-day trends <svg class="ico" width="14" height="14"><use href="#i-arrow"/></svg></a></p>
+
+<div class="columns">
+<div class="col">
 <section>
-  <h2>My account</h2>
-  <p>Email: {{ me.email }}</p>
-  <p>Contact ID: <code>{{ me.contact_id }}</code> <small>(share it only with people you want to invite you)</small></p>
-  <p><a href="/account">Edit profile or delete account</a></p>
+  <h2><span class="tile t-teal"><svg width="18" height="18"><use href="#i-user"/></svg></span>My account</h2>
+  <div class="person">
+    <span class="avatar big">{{ me.display_name[:1]|upper }}</span>
+    <div>
+      <p><strong>{{ me.display_name }}</strong></p>
+      <p class="muted">Email: {{ me.email }}</p>
+    </div>
+  </div>
+  <div class="idbox">
+    <p>Contact ID: <code class="id">{{ me.contact_id }}</code> <button type="button" class="copy" data-copy="{{ me.contact_id }}">Copy</button></p>
+    <p class="hint">Share it only with people you want to invite you.</p>
+  </div>
+  <p><a class="more" href="/account">Edit profile or delete account <svg class="ico" width="14" height="14"><use href="#i-arrow"/></svg></a></p>
 </section>
-
+</div>
+<div class="col">
 <section>
-  <h2>My device</h2>
-  {% if device %}<p>Device ID: <code>{{ device.device_id }}</code></p>{% else %}<p>No device registered.</p>{% endif %}
-  {% if new_token %}
-  <p class="message">Device token (shown once, copy it now): <code>{{ new_token }}</code></p>
-  {% endif %}
-  <form method="post" action="/device"><button>{{ "Replace device" if device else "Register device" }}</button></form>
-</section>
-
-<section>
-  <h2>Invite a trusted contact</h2>
-  <form method="post" action="/invitations" class="row">
-    <input name="contact_id" placeholder="Contact ID" maxlength="8" required>
-    <button>Send invitation</button>
-  </form>
-</section>
-
-<section>
-  <h2>Invitations I received</h2>
+  <h2><span class="tile t-amber"><svg width="18" height="18"><use href="#i-inbox"/></svg></span>Invitations I received</h2>
   {% for inv in received %}
-  <div class="row">
-    <span>{{ inv.display_name }} invited you</span>
-    <form method="post" action="/invitations/{{ inv.id }}/accept" class="inline"><button>Accept</button></form>
-    <form method="post" action="/invitations/{{ inv.id }}/decline" class="inline"><button>Decline</button></form>
+  <div class="row invite">
+    <span class="avatar">{{ inv.display_name[:1]|upper }}</span>
+    <span class="grow">{{ inv.display_name }} invited you</span>
+    <form method="post" action="/invitations/{{ inv.id }}/accept" class="inline"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}"><button>Accept</button></form>
+    <form method="post" action="/invitations/{{ inv.id }}/decline" class="inline"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}"><button>Decline</button></form>
   </div>
-  {% else %}<p>None.</p>{% endfor %}
+  {% else %}<p class="empty">None.</p>{% endfor %}
 </section>
-
-<section>
-  <h2>My trusted contacts</h2>
-  {% for c in my_contacts %}
-  <div class="card">
-    <p><strong>{{ c.display_name }}</strong> — {{ "accepted" if c.status == "accepted" else "pending" }}</p>
-    {% if c.status == "accepted" and editing == c.id %}
-    <form method="post" action="/contacts/{{ c.id }}/categories">
-      {% for key, name in categories.items() %}
-      <label class="check"><input type="checkbox" name="category" value="{{ key }}" {{ "checked" if c["share_" + key] }}> {{ name }}</label>
-      {% endfor %}
-      <div class="row"><button>Save</button> <a href="/">Cancel</a></div>
-    </form>
-    {% else %}
-      {% if c.status == "accepted" %}
-      {% set shared = [] %}
-      {% for key, name in categories.items() %}{% if c["share_" + key] %}{% set _ = shared.append(name) %}{% endif %}{% endfor %}
-      <p>Shared: {{ shared | join(", ") if shared else "nothing yet" }}</p>
-      {% endif %}
-      <div class="row">
-        {% if c.status == "accepted" %}<a class="button" href="/?edit={{ c.id }}">Edit</a>{% endif %}
-        <form method="post" action="/contacts/{{ c.id }}/remove" class="inline"><button>Remove</button></form>
-      </div>
-    {% endif %}
-  </div>
-  {% else %}<p>None.</p>{% endfor %}
-</section>
-
-<section>
-  <h2>People sharing with me</h2>
-  {% for w in sharing_with_me %}
-  <p><a href="/wearers/{{ w.id }}">{{ w.display_name }}</a></p>
-  {% else %}<p>None.</p>{% endfor %}
-</section>
+</div>
+</div>
 {% endblock %}

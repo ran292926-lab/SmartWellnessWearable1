@@ -14,4 +14,5 @@ class Config:
     # If DATA_KEY is not set, the key is read from (or created in) KEY_FILE.
     DATA_KEY = os.environ.get("DATA_KEY")
     RATE_LIMIT = 60   # SR27: requests per minute per client IP address
+    CSRF_CHECK = True # F1: reject forms without the session's CSRF token
     KEY_FILE = os.environ.get("KEY_FILE", str(Path.home() / ".smart_wellness" / "data.key"))

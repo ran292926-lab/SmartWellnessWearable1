@@ -1,11 +1,13 @@
 """Smart Wellness Wearable web application."""
 
+import time
+
 from flask import Flask, render_template, request
 from werkzeug.exceptions import HTTPException
 
 from . import crypto, db, ratelimit, retention
 from .config import Config
-from .sessions import load_session
+from .sessions import check_csrf, load_session
 
 
 def create_app(overrides=None):
@@ -13,6 +15,10 @@ def create_app(overrides=None):
     app.config.from_object(Config)
     if overrides:
         app.config.update(overrides)
+    # F9: browsers keep CSS and JavaScript for an hour, so they do not count towards
+    # the SR27 limit on every page; the version changes at each server start.
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 3600
+    app.jinja_env.globals["static_version"] = str(int(time.time()))
 
     db.init_db(app.config["DATABASE"])
     crypto.load_key(app.config)
@@ -22,6 +28,7 @@ def create_app(overrides=None):
     app.before_request(ratelimit.check)           # SR27
     app.before_request(retention.apply_hourly)   # PR5, PR12, SR23
     app.before_request(load_session)
+    app.before_request(check_csrf)               # F1
     app.teardown_appcontext(db.close_db)
 
     from . import account, api, auth, pages

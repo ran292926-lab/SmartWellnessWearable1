@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import hmac
 import os
 import secrets
 from pathlib import Path
@@ -18,6 +19,19 @@ def hash_password(password):
     return kdf.derive_phc_encoded(password.encode())
 
 
+# A real Argon2id hash of a random value, checked when the email is unknown so that
+# the login takes the same time whether or not the account exists (Week 9 review, F2).
+_dummy_hash = None
+
+
+def verify_dummy_password(password):
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = hash_password(secrets.token_urlsafe(16))
+    verify_password(password, _dummy_hash)
+    return False
+
+
 def verify_password(password, stored_hash):
     try:
         Argon2id.verify_phc_encoded(password.encode(), stored_hash)
@@ -30,10 +44,11 @@ def verify_password(password, stored_hash):
 # ---- SR18: key kept outside the source code and the database ----
 
 _aes = None
+_csrf_key = None
 
 
 def load_key(config):
-    global _aes
+    global _aes, _csrf_key
     if config.get("DATA_KEY"):
         key = base64.b64decode(config["DATA_KEY"])
     else:
@@ -44,6 +59,23 @@ def load_key(config):
         key_file.chmod(0o600)   # readable by the owner only, also for key files created earlier
         key = base64.b64decode(key_file.read_bytes())
     _aes = AESGCM(key)
+    _csrf_key = hashlib.sha256(b"csrf-token-key" + key).digest()   # derived, never stored
+
+
+# ---- Week 9 review, F3: the database stores only a hash of each session ID ----
+
+def hash_session_id(session_id):
+    return hashlib.sha256(session_id.encode()).hexdigest()
+
+
+# ---- Week 9 review, F1: CSRF token tied to the session ----
+
+def csrf_token(session_hash):
+    return hmac.new(_csrf_key, session_hash.encode(), hashlib.sha256).hexdigest()
+
+
+def csrf_valid(session_hash, token):
+    return bool(token) and hmac.compare_digest(csrf_token(session_hash), token)
 
 
 def encrypt(value):
@@ -55,7 +87,7 @@ def decrypt(blob):
     return _aes.decrypt(blob[:12], blob[12:], None).decode()
 
 
-# ---- SR9, SR28: device token stored on the server only as a hash ----
+# ---- SR9: device token stored on the server only as a hash ----
 
 def new_token():
     return secrets.token_urlsafe(32)

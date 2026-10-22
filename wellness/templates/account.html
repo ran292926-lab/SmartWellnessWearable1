@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
-<p><a href="/">&larr; Back</a></p>
+<p><a class="back" href="/">&larr; Back</a></p>
+<p class="eyebrow">Settings</p>
 <h1>My account</h1>
+<div class="columns">
+<div class="col">
 
 <section>
-  <h2>Profile</h2>
+  <h2><span class="tile t-teal"><svg width="18" height="18"><use href="#i-user"/></svg></span>Profile</h2>
   <p>Contact ID: <code>{{ profile.contact_id }}</code></p>
-  <form method="post" action="/account/profile">
+  <form method="post" action="/account/profile"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}">
     <label>Display name <input name="display_name" maxlength="50" value="{{ profile.display_name }}" required></label>
     <label>Birth year <input type="number" name="birth_year" value="{{ profile.birth_year }}" required></label>
     <label>Weight (kg) <input type="number" name="weight" step="0.1" value="{{ profile.weight }}" required></label>
@@ -14,10 +17,21 @@
   </form>
 </section>
 
+
+<section class="danger-zone">
+  <h2><span class="tile t-red"><svg width="18" height="18"><use href="#i-trash"/></svg></span>Delete account</h2>
+  <p>This deletes your account, readings, alerts, device, sessions, invitations and trusted contacts.</p>
+  <form method="post" action="/account/delete"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}">
+    <label class="check"><input type="checkbox" name="confirm" value="yes"> I confirm that I want to delete my account</label>
+    <button class="danger">Delete my account</button>
+  </form>
+</section>
+</div>
+<div class="col">
 <section>
-  <h2>Change email</h2>
+  <h2><span class="tile t-blue"><svg width="18" height="18"><use href="#i-mail"/></svg></span>Change email</h2>
   <p>Current email: {{ profile.email }}</p>
-  <form method="post" action="/account/email">
+  <form method="post" action="/account/email"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}">
     <label>New email <input type="email" name="email" required></label>
     <label>Current password <input type="password" name="current_password" required></label>
     <button>Change email</button>
@@ -25,20 +39,14 @@
 </section>
 
 <section>
-  <h2>Change password</h2>
-  <form method="post" action="/account/password">
+  <h2><span class="tile t-indigo"><svg width="18" height="18"><use href="#i-lock"/></svg></span>Change password</h2>
+  <form method="post" action="/account/password"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}">
     <label>Current password <input type="password" name="current_password" required></label>
     <label>New password <input type="password" name="new_password" minlength="8" maxlength="128" required></label>
     <button>Change password</button>
   </form>
 </section>
 
-<section>
-  <h2>Delete account</h2>
-  <p>This deletes your account, readings, alerts, device, sessions, invitations and trusted contacts.</p>
-  <form method="post" action="/account/delete">
-    <label class="check"><input type="checkbox" name="confirm" value="yes"> I confirm that I want to delete my account</label>
-    <button class="danger">Delete my account</button>
-  </form>
-</section>
+</div>
+</div>
 {% endblock %}

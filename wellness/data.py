@@ -52,3 +52,40 @@ def daily_summary(wearer_id, category, days=7):
         elif category == "sleep":
             result.append({"day": day, "sleep_hours": values[-1]})
     return result
+
+
+def dashboard(user_id, weight_kg, birth_year):
+    """FR8, FR10-FR13: the wearer's own dashboard values for today (Asia/Riyadh)."""
+    now_riyadh = datetime.now(RIYADH)
+    today = now_riyadh.date().isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(timespec="seconds")
+    rows = query_all(
+        "SELECT type, value_enc, recorded_at FROM readings WHERE user_id = ? AND recorded_at >= ? "
+        "ORDER BY recorded_at",
+        (user_id, since),
+    )
+    latest_hr, hr_today, steps, sleep = None, [], None, None
+    for r in rows:
+        value = float(decrypt(r["value_enc"]))
+        is_today = _riyadh_day(r["recorded_at"]) == today
+        if r["type"] == "heart_rate":
+            latest_hr = {"bpm": round(value),
+                         "time": datetime.fromisoformat(r["recorded_at"]).astimezone(RIYADH).strftime("%H:%M")}
+            if is_today:
+                hr_today.append(value)
+        elif r["type"] == "steps" and is_today:
+            steps = max(steps or 0, int(value))      # FR6: cumulative count, so the largest is the total
+        elif r["type"] == "sleep" and is_today:
+            sleep = value                            # FR7: last night's summary arrives today
+
+    max_hr = 220 - (now_riyadh.year - int(birth_year))                     # FR12, FR13
+    return {
+        "latest_hr": latest_hr,                                                # FR8
+        "hr_min": round(min(hr_today)) if hr_today else None,
+        "hr_max": round(max(hr_today)) if hr_today else None,
+        "hr_points": [round(v) for v in hr_today[-36:]],
+        "max_hr": max_hr,
+        "steps": steps,                                                        # FR8
+        "sleep_hours": sleep,                                                  # FR8
+        "calories": round(0.00055 * steps * weight_kg) if steps is not None else None,   # FR10, FR11
+    }

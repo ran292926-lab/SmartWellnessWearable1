@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from wellness import create_app, ratelimit
+from wellness import create_app, crypto, ratelimit
 
 THIS_YEAR = datetime.now(ZoneInfo("Asia/Riyadh")).year
 
@@ -24,6 +24,7 @@ class AppTest(unittest.TestCase):
             "DATABASE": self.db_path,
             "DATA_KEY": base64.b64encode(os.urandom(32)).decode(),
             "RATE_LIMIT": 100000,   # the SR27 test sets its own limit
+            "CSRF_CHECK": False,    # the F1 tests switch the CSRF check on
         })
         ratelimit.reset()
 
@@ -121,11 +122,14 @@ class AppTest(unittest.TestCase):
         cookie = r.headers["Set-Cookie"]
         self.assertIn("HttpOnly", cookie)                                                     # SR3
         self.assertIn("Secure", cookie)                                                       # SR3
+        self.assertIn("SameSite=Lax", cookie)                                                 # F1
         self.assertEqual(c.get("/").status_code, 200)
 
         session_id = c.get_cookie("session_id").value
+        self.assertEqual(self.sql("SELECT * FROM sessions WHERE id = ?", (session_id,)), [])  # F3: not stored as is
+        self.assertEqual(len(self.sql("SELECT * FROM sessions WHERE id = ?", (crypto.hash_session_id(session_id),))), 1)
         c.post("/logout")
-        self.assertEqual(self.sql("SELECT * FROM sessions WHERE id = ?", (session_id,)), [])  # SR6
+        self.assertEqual(self.sql("SELECT * FROM sessions"), [])                              # SR6
         self.assertEqual(c.get("/api/wearers/1/steps").status_code, 401)                     # SR11
 
         events = [r["event_type"] for r in self.sql("SELECT event_type FROM audit_log")]
@@ -341,7 +345,7 @@ class AppTest(unittest.TestCase):
         self.register(c)
         self.login(c)
         device_id, token = self.device(c)
-        html = c.get("/").get_data(as_text=True)
+        html = c.get("/device").get_data(as_text=True)
         self.assertNotIn(token, html)
         self.assertIn(device_id, html)
         self.assertEqual(len(self.sql("SELECT * FROM devices")), 1)
@@ -515,13 +519,13 @@ class AppTest(unittest.TestCase):
         a, user_a = self.new_user("Sara", "sara@example.com")
         b, user_b = self.new_user("Noura", "noura@example.com")
         inv = self.link(a, b, "noura@example.com")
-        html = a.get("/").get_data(as_text=True)
+        html = a.get("/contacts").get_data(as_text=True)
         self.assertIn("Shared: nothing yet", html)
         self.assertNotIn('name="category"', html)                  # checkboxes only in edit mode
-        self.assertIn('name="category"', a.get(f"/?edit={inv}").get_data(as_text=True))
+        self.assertIn('name="category"', a.get(f"/contacts?edit={inv}").get_data(as_text=True))
         r = a.post(f"/contacts/{inv}/categories", data={"category": ["steps"]})
         self.assertEqual(r.status_code, 302)
-        html = a.get("/").get_data(as_text=True)
+        html = a.get("/contacts").get_data(as_text=True)
         self.assertIn("Sharing settings saved.", html)
         self.assertIn("Shared: Daily step summary", html)
 
@@ -572,6 +576,107 @@ class AppTest(unittest.TestCase):
             pages.append("Invitation sent." in html and "No other user" not in html and "already" not in html)
         self.assertEqual(pages, [True] * 4)
         self.assertEqual(len(self.sql("SELECT * FROM invitations")), 1)
+
+    # ---- Dashboard and charts (FR8-FR13) ----
+
+    def test_dashboard_shows_todays_values_and_calories(self):
+        c = self.client()
+        self.register(c)                       # weight 60.5 kg, born 30 years ago
+        self.login(c)
+        device_id, token = self.device(c)
+        start = datetime.now(timezone.utc) - timedelta(minutes=15)
+        for i, v in enumerate((64, 88, 71)):
+            t = (start + timedelta(minutes=5 * i)).isoformat(timespec="seconds")
+            self.assertEqual(self.send(c, device_id, token, "heart_rate", v, t).status_code, 201)
+        self.send(c, device_id, token, "steps", 4000)
+        self.send(c, device_id, token, "sleep", 7.5)
+        html = c.get("/").get_data(as_text=True)
+        self.assertIn('data-count="71"', html)                                                # FR8 latest heart rate
+        self.assertIn("4,000", html)                                                          # FR8 today's steps
+        self.assertIn("7<small>h</small> 30<small>m</small>", html)                           # FR8 last night's sleep
+        self.assertIn(f'data-count="{round(0.00055 * 4000 * 60.5)}"', html)                  # FR10, FR11
+        details = c.get("/trends").get_data(as_text=True)
+        self.assertIn("190 <i>BPM</i>", details)                                              # FR12, FR13: 220 - 30
+
+    def test_trends_page_shows_only_own_data(self):
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        device_id, token = self.device(a)
+        self.send(a, device_id, token, "steps", 1234)
+        self.assertIn("1234 steps", a.get("/trends").get_data(as_text=True))                  # FR9
+        self.assertNotIn("1234 steps", b.get("/trends").get_data(as_text=True))               # PR10
+        self.assertEqual(self.client().get("/trends").status_code, 401)                       # SR11
+
+    # ---- Week 9 secure coding review fixes ----
+
+    def test_csrf_token_required_for_forms(self):                                # F1
+        self.app.config["CSRF_CHECK"] = True
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        r = a.post("/invitations", data={"contact_id": user_b["contact_id"]})        # forged: no token
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(self.sql("SELECT * FROM invitations"), [])
+        r = a.post("/invitations", data={"contact_id": user_b["contact_id"], "csrf_token": "x" * 64})
+        self.assertEqual(r.status_code, 403)
+        token = re.search(r'name="csrf_token" value="([0-9a-f]{64})"', a.get("/contacts").get_data(as_text=True)).group(1)
+        self.assertNotIn(token, b.get("/contacts").get_data(as_text=True))           # each session has its own token
+        r = a.post("/invitations", data={"contact_id": user_b["contact_id"], "csrf_token": token})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(len(self.sql("SELECT * FROM invitations")), 1)
+        self.assertEqual(a.post("/logout").status_code, 403)                          # logout needs the token too
+        events = [r["event_type"] for r in self.sql("SELECT event_type FROM audit_log")]
+        self.assertIn("csrf_failure", events)
+
+    def test_unknown_email_login_does_password_work(self):                       # F2
+        from unittest import mock
+        c = self.client()
+        self.register(c)
+        with mock.patch("wellness.crypto.verify_password", wraps=crypto.verify_password) as spy:
+            r = self.login(c, email="nobody@example.com", password="whatever-1")
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(spy.call_count, 1)          # an Argon2id check also runs for an unknown email
+
+    def test_future_timestamp_rejected(self):                                    # F4
+        c = self.client()
+        self.register(c)
+        self.login(c)
+        device_id, token = self.device(c)
+        soon = (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(timespec="seconds")
+        later = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(timespec="seconds")
+        self.assertEqual(self.send(c, device_id, token, "heart_rate", 72, soon).status_code, 201)   # clock tolerance
+        r = self.send(c, device_id, token, "heart_rate", 73, later)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json["error"], "timestamp cannot be in the future.")
+
+    def test_server_output_has_no_ip_or_version(self):                           # F5, F6
+        import contextlib, io
+        from werkzeug import serving
+        from wellness import server
+        server.configure()
+        handler = serving.WSGIRequestHandler.__new__(serving.WSGIRequestHandler)
+        handler.client_address = ("203.0.113.7", 50000)
+        self.assertEqual(handler.version_string(), "SmartWellness")                  # F6
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            handler.log_error("SSL error occurred: %s", "handshake failed")
+            fake = type("S", (), {"passthrough_errors": False})()
+            serving.BaseWSGIServer.handle_error(fake, None, ("203.0.113.7", 50000))
+        self.assertNotIn("203.0.113.7", err.getvalue())                             # F5, PR8
+
+    def test_rate_limit_forgets_old_addresses(self):                             # F8
+        from wellness import ratelimit
+        ratelimit._requests["198.51.100.9"].append(0.0)        # last request long ago
+        ratelimit._last_sweep = 0.0
+        self.client().get("/login")
+        self.assertNotIn("198.51.100.9", ratelimit._requests)
+
+    def test_static_files_are_cached(self):                                      # F9
+        c = self.client()
+        html = c.get("/login").get_data(as_text=True)
+        self.assertRegex(html, r'/static/style\.css\?v=\d+')
+        r = c.get("/static/style.css")
+        self.assertIn("max-age=3600", r.headers.get("Cache-Control", ""))
+        r.close()
 
 
 if __name__ == "__main__":

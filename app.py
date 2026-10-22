@@ -2,17 +2,14 @@
 
 import os
 
-from werkzeug.serving import WSGIRequestHandler
-
-from wellness import create_app
+from wellness import create_app, server
 from wellness.config import PROJECT_DIR
 from wellness.tls import server_context
 
 app = create_app()
 
-# PR8: the development server would otherwise log every request with the client's
-# IP address, which is not in the Personal Data Map.
-WSGIRequestHandler.log_request = lambda *args, **kwargs: None
+# PR8, F5, F6: no client IP addresses in the server output and no version in the Server header
+server.configure()
 
 if __name__ == "__main__":
     # SR16: serve over TLS. USE_TLS=0 is only for Google Colab, where Colab's

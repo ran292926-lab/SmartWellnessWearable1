@@ -79,6 +79,7 @@ def login():
     user = query_one("SELECT * FROM users WHERE email = ?", (email,))
 
     if user is None:
+        crypto.verify_dummy_password(password)   # F2: same Argon2id work as a real account
         audit.log("failed_login", "unknown_email")
         return render_template("login.html", error=LOGIN_ERROR), 401
 

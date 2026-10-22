@@ -1,4 +1,4 @@
-"""Account page: contact ID, device, invitations and data sharing (FR17-FR24)."""
+"""Dashboard and account pages: readings, contact ID, device, invitations and sharing (FR8-FR13, FR17-FR24)."""
 
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -6,13 +6,13 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, g, redirect, render_template, request
 
 from . import access, audit, crypto
-from .data import daily_summary
+from .data import daily_summary, dashboard
 from .db import execute, now, query_all, query_one
 from .sessions import login_required
 
 bp = Blueprint("pages", __name__)
 
-# Plain device tokens waiting to be shown once; kept in memory only, never in the database (SR28).
+# Plain device tokens waiting to be shown once (SR28); kept in memory only, never in the database (SR9).
 _pending_tokens = {}
 # One-time success messages shown after a redirect, so a page reload does not resend a form.
 _pending_messages = {}
@@ -25,39 +25,84 @@ CATEGORY_NAMES = {
 }
 
 
+def _message(message=None):
+    return message or _pending_messages.pop(g.session_id, None)
+
+
+def _me():
+    return query_one("SELECT * FROM users WHERE id = ?", (g.user_id,))
+
+
+def _dashboard(me):
+    """FR8-FR13: today's values, plus FR9 7-day series for the small charts."""
+    weight = float(crypto.decrypt(me["weight_enc"]))
+    dash = dashboard(g.user_id, weight, crypto.decrypt(me["birth_year_enc"]))
+    steps_week = list(reversed(daily_summary(g.user_id, "steps")))      # oldest day first
+    week = {
+        "steps": [(d["day"], d["steps"]) for d in steps_week],
+        "sleep": [(d["day"], d["sleep_hours"]) for d in reversed(daily_summary(g.user_id, "sleep"))],
+        "calories": [(d["day"], round(0.00055 * d["steps"] * weight)) for d in steps_week],   # FR10
+    }
+    return dash, week
+
+
 @bp.get("/")
 @login_required
 def home(message=None, error=None):
-    # The device token is shown once, on the first page load after it is created.
-    new_token = _pending_tokens.pop(g.session_id, None)
-    message = message or _pending_messages.pop(g.session_id, None)
-    me = query_one("SELECT * FROM users WHERE id = ?", (g.user_id,))
-    device = query_one("SELECT device_id FROM devices WHERE user_id = ?", (g.user_id,))
-
+    me = _me()
+    dash, _ = _dashboard(me)                                                # FR8, FR11: main numbers
     # FR20: pending invitations with the inviting wearer's display name
     received = query_all(
         "SELECT i.id, u.display_name FROM invitations i JOIN users u ON u.id = i.wearer_id "
         "WHERE i.contact_user_id = ? AND i.status = 'pending'",
         (g.user_id,),
     )
+    return render_template("home.html", me=me, dash=dash, received=received,
+                           message=_message(message), error=error)
+
+
+@bp.get("/trends")
+@login_required
+def trends():
+    # Health details: today's details (FR8-FR13) and the wearer's own 7-day charts (FR9)
+    dash, week = _dashboard(_me())
+    sections = [(CATEGORY_NAMES[c], c, daily_summary(g.user_id, c)) for c in ("heart_rate", "steps", "sleep")]
+    return render_template("trends.html", dash=dash, week=week, sections=sections, message=_message())
+
+
+@bp.get("/device")
+@login_required
+def device_page():
+    # The device token is shown once, on the first page load after it is created (SR28).
+    new_token = _pending_tokens.pop(g.session_id, None)
+    device = query_one("SELECT device_id FROM devices WHERE user_id = ?", (g.user_id,))
+    return render_template("device.html", device=device, new_token=new_token, message=_message())
+
+
+@bp.get("/contacts")
+@login_required
+def contacts(message=None, error=None):
     # The wearer's own contacts and their selected categories (FR22)
     my_contacts = query_all(
         "SELECT i.*, u.display_name FROM invitations i JOIN users u ON u.id = i.contact_user_id "
         "WHERE i.wearer_id = ? ORDER BY i.created_at",
         (g.user_id,),
     )
+    return render_template("contacts.html", my_contacts=my_contacts, categories=CATEGORY_NAMES,
+                           editing=request.args.get("edit", type=int),
+                           message=_message(message), error=error)
+
+
+@bp.get("/shared")
+@login_required
+def shared():
     # Wearers who share data with this user (FR23)
     sharing_with_me = query_all(
         "SELECT u.id, u.display_name FROM invitations i JOIN users u ON u.id = i.wearer_id "
         "WHERE i.contact_user_id = ? AND i.status = 'accepted'",
         (g.user_id,),
     )
-    return render_template(
-        "home.html", me=me, device=device, received=received, my_contacts=my_contacts,
-        sharing_with_me=sharing_with_me, categories=CATEGORY_NAMES,
-        new_token=new_token, message=message, error=error,
-        editing=request.args.get("edit", type=int),
-    )
+    return render_template("shared.html", sharing_with_me=sharing_with_me, message=_message())
 
 
 # ---- SR9: register the simulated wearable and give it a secret token ----
@@ -72,7 +117,7 @@ def register_device():
     execute("INSERT INTO devices (user_id, device_id, token_hash) VALUES (?, ?, ?)",
             (g.user_id, device_id, crypto.hash_token(token)))
     _pending_tokens[g.session_id] = token
-    return redirect("/")
+    return redirect("/device")
 
 
 # ---- FR19: send an invitation by contact ID ----
@@ -93,7 +138,7 @@ def send_invitation():
         audit.log("invitation_sent", "not_sent", g.user_id)                         # SR29
     # SR30: the same confirmation whether or not the contact ID belongs to an account
     _pending_messages[g.session_id] = "Invitation sent."
-    return redirect("/")
+    return redirect("/contacts")
 
 
 # ---- FR21: accept or decline ----
@@ -142,14 +187,14 @@ def set_categories(invitation_id):
     # PR4: categories can be selected only after the contact has accepted
     if link is None or link["status"] != "accepted":
         audit.log("authorization_failure", "denied", g.user_id)
-        return home(error="Contact not found."), 403
+        return contacts(error="Contact not found."), 403
     chosen = request.form.getlist("category")
     values = [1 if c in chosen else 0 for c in access.CATEGORIES]
     execute("UPDATE invitations SET share_heart_rate = ?, share_steps = ?, share_sleep = ?, "
             "share_alerts = ? WHERE id = ?", (*values, invitation_id))
     audit.log("sharing_change", "success", g.user_id)                               # SR29
     _pending_messages[g.session_id] = "Sharing settings saved."
-    return redirect("/")
+    return redirect("/contacts")
 
 
 @bp.post("/contacts/<int:invitation_id>/remove")
@@ -157,10 +202,10 @@ def set_categories(invitation_id):
 def remove_contact(invitation_id):
     if _own_link(invitation_id) is None:
         audit.log("authorization_failure", "denied", g.user_id)
-        return home(error="Contact not found."), 403
+        return contacts(error="Contact not found."), 403
     execute("DELETE FROM invitations WHERE id = ?", (invitation_id,))
     audit.log("contact_deletion", "success", g.user_id)                              # SR21
-    return redirect("/")
+    return redirect("/contacts")
 
 
 # ---- FR23: a trusted contact views the selected categories ----

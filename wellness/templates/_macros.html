@@ -1,0 +1,56 @@
+{# Shared pieces for the dashboard, trends and wearer pages. #}
+
+{% macro hm(hours) -%}
+{%- set h = hours|int %}{% set m = ((hours - h) * 60)|round|int %}{{ h }}<small>h</small> {{ m }}<small>m</small>
+{%- endmacro %}
+
+{% macro sparkline(points, cls="") -%}
+<svg class="spark {{ cls }}" viewBox="0 0 200 54" preserveAspectRatio="none" aria-hidden="true">
+{%- if points|length > 1 %}
+  {%- set lo = (points|min) - 4 %}{% set hi = (points|max) + 4 %}
+  <polyline class="spark-line" points="{% for v in points %}{{ (loop.index0 * 200 / (points|length - 1))|round(1) }},{{ (50 - (v - lo) / (hi - lo) * 46)|round(1) }} {% endfor %}"/>
+{%- else %}
+  <polyline class="spark-line ecg-line" points="0,30 52,30 62,30 70,10 80,50 88,22 96,30 128,30 136,30 144,14 152,44 160,26 166,30 200,30"/>
+{%- endif %}
+</svg>
+{%- endmacro %}
+
+{% macro chart(key, days) -%}
+    {% if key == "heart_rate" %}{% set lo = (days|map(attribute="min_bpm")|min) - 10 %}{% set hi = (days|map(attribute="max_bpm")|max) + 10 %}
+    {% elif key == "steps" %}{% set top = days|map(attribute="steps")|max %}
+    {% else %}{% set top = days|map(attribute="sleep_hours")|max %}{% endif %}
+    <div class="chart">
+      {% for d in days|reverse %}
+      {% if key == "heart_rate" %}
+      <div class="col" data-tip="{{ d.day }}: min {{ d.min_bpm|int }} · avg {{ d.avg_bpm }} · max {{ d.max_bpm|int }} bpm">
+        <span class="val">{{ d.avg_bpm }}</span>
+        <div class="track"><i class="range" style="bottom: {{ (d.min_bpm - lo) / (hi - lo) * 100 }}%; height: {{ (d.max_bpm - d.min_bpm) / (hi - lo) * 100 }}%"></i><b class="avg" style="bottom: {{ (d.avg_bpm - lo) / (hi - lo) * 100 }}%"></b></div>
+        <span class="day">{{ d.day[5:] }}</span>
+      </div>
+      {% elif key == "steps" %}
+      <div class="col" data-tip="{{ d.day }}: {{ d.steps }} steps">
+        <span class="val">{{ "%.1f"|format(d.steps / 1000) }}k</span>
+        <div class="track"><i class="fill" style="height: {{ (d.steps / top * 100) if top else 0 }}%"></i></div>
+        <span class="day">{{ d.day[5:] }}</span>
+      </div>
+      {% else %}
+      <div class="col" data-tip="{{ d.day }}: {{ d.sleep_hours }} hours">
+        <span class="val">{{ d.sleep_hours }}h</span>
+        <div class="track"><i class="fill" style="height: {{ (d.sleep_hours / top * 100) if top else 0 }}%"></i></div>
+        <span class="day">{{ d.day[5:] }}</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% if key == "heart_rate" %}<p class="legend"><i class="lg-range"></i> daily min–max <b class="lg-avg"></b> daily average</p>{% endif %}
+{%- endmacro %}
+
+{% macro minibars(items, unit="") -%}
+{%- if items %}{% set top = items|map(attribute=1)|max %}
+<div class="minibars" aria-hidden="true">
+  {%- for day, v in items %}
+  <span class="mb{{ ' today' if loop.last }}" data-tip="{{ day }}: {{ v }} {{ unit }}"><i style="height: {{ ((v / top * 100) if top else 0)|round(1) }}%"></i><small>{{ day[8:] }}</small></span>
+  {%- endfor %}
+</div>
+{%- endif %}
+{%- endmacro %}

@@ -2,7 +2,7 @@
 
 import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 RIYADH = ZoneInfo("Asia/Riyadh")
@@ -93,6 +93,9 @@ def reading(data):
         recorded_at = recorded.astimezone(timezone.utc).isoformat(timespec="seconds")  # NFR5
     except OverflowError:
         raise ValidationError("timestamp is out of range.")
+    # F4: a reading cannot be recorded more than 5 minutes in the future (clock tolerance)
+    if recorded > datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise ValidationError("timestamp cannot be in the future.")
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValidationError("value must be a number.")

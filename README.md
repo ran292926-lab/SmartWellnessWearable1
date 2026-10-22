@@ -38,20 +38,22 @@ python -m unittest -v
 | `wellness/schema.sql` | Database tables |
 | `wellness/db.py` | Database access with parameterized queries |
 | `wellness/config.py` | Settings from environment variables |
-| `wellness/crypto.py` | Argon2id, AES-256, device-token hash, contact ID |
-| `wellness/sessions.py` | Server-side sessions and login check |
+| `wellness/crypto.py` | Argon2id, AES-256, device-token and session-ID hashes, CSRF tokens, contact ID |
+| `wellness/sessions.py` | Server-side sessions, login check and CSRF check |
 | `wellness/validation.py` | Server-side input validation |
 | `wellness/auth.py` | Register, log in, log out |
 | `wellness/access.py` | Authorization check for the two roles |
-| `wellness/pages.py` | Home page, device, invitations, data sharing |
+| `wellness/pages.py` | Dashboard, health details, device, invitations, data sharing |
 | `wellness/api.py` | Device readings API and wearer data API |
-| `wellness/data.py` | Daily summaries |
+| `wellness/data.py` | Dashboard values and daily summaries |
 | `wellness/audit.py` | Audit log |
 | `wellness/account.py` | Profile changes and account deletion |
 | `wellness/retention.py` | Retention rules |
 | `wellness/tls.py` | Local TLS certificate |
 | `wellness/ratelimit.py` | Request limit per client IP address, in memory only |
+| `wellness/server.py` | Web server output without client IP addresses or version numbers |
 | `wellness/templates/` | HTML pages |
+| `wellness/static/` | Style sheet and interface scripts (light/dark mode, copy buttons, chart tooltips) |
 | `tests/test_app.py` | Tests |
 
 ## Requirements implemented in this snapshot
@@ -62,13 +64,14 @@ python -m unittest -v
 | Contact ID and invitations | FR17, FR18, FR19, FR20, FR21 | `auth.py`, `pages.py` |
 | Data sharing | FR22, FR23, FR24 | `pages.py`, `api.py`, `data.py` |
 | Device readings | FR6, FR7 | `api.py`, `simulator.py` |
+| Dashboard and charts | FR8, FR9, FR10, FR11, FR12, FR13 | `data.py`, `pages.py`, `home.html`, `trends.html` |
 | Authentication and sessions | SR1–SR9 | `crypto.py`, `sessions.py`, `auth.py`, `account.py`, `api.py` |
 | Authorization | SR10, SR11, SR12 | `access.py`, `sessions.py` |
 | Input validation | SR2, SR13, SR14, SR15 | `validation.py`, `db.py` |
 | Data protection | SR16, SR17, SR18, SR19, SR20 | `tls.py`, `crypto.py`, `config.py`, `__init__.py` |
 | Accountability | SR21–SR24, SR29 | `audit.py`, `access.py`, `retention.py` |
 | Output encoding | SR25 | templates (automatic HTML encoding) |
-| Added in Phase 2 | SR26, SR27, SR28, SR29, SR30, PR20 | `account.py`, `ratelimit.py`, `crypto.py`, `pages.py`, `home.html` |
+| Added in Phase 3 | SR26, SR27, SR28, SR29, SR30, PR20 | `account.py`, `ratelimit.py`, `pages.py`, `home.html` |
 | Privacy | PR1–PR7, PR10–PR14 | `auth.py`, `pages.py`, `access.py`, `account.py`, `retention.py` |
 | Data quality | NFR4, NFR5, NFR7, NFR13 (database setting only; alert thresholds come with FR14) | `schema.sql`, `validation.py`, `data.py`, `config.py` |
 
@@ -84,6 +87,8 @@ python -m unittest -v
   so this is the same as per device ID while the device is not replaced.
 - **Device timestamps:** the device chooses the timestamp. No requirement limits it, so a
   reading dated far in the future would never reach the 90-day limit (PR12). Recorded for review.
+- **Requirements added in Phase 3:** SR26–SR30 and PR20 were not in the Week 7 report; they
+  were added to the requirements in Phase 3 (Week 8).
 - **Audit log (SR24):** no user can change or delete log entries. The application itself
   changes them in two defined cases only: entries older than 12 months are deleted (SR23), and
   the user ID is replaced with a random ID when an account is deleted (PR14).

@@ -11,12 +11,24 @@ from flask import current_app, render_template, request
 
 WINDOW = 60   # seconds
 _requests = defaultdict(deque)
+_last_sweep = 0.0
+
+
+def _sweep(now):
+    """F8: forget addresses with no request in the last minute, so memory does not grow."""
+    global _last_sweep
+    if now - _last_sweep < WINDOW:
+        return
+    _last_sweep = now
+    for address in [a for a, times in _requests.items() if not times or now - times[-1] >= WINDOW]:
+        del _requests[address]
 
 
 def check():
     """Runs before every request."""
     limit = current_app.config["RATE_LIMIT"]
     now = time.monotonic()
+    _sweep(now)
     times = _requests[request.remote_addr]
     while times and now - times[0] >= WINDOW:
         times.popleft()
@@ -28,4 +40,6 @@ def check():
 
 
 def reset():
+    global _last_sweep
     _requests.clear()
+    _last_sweep = 0.0

@@ -4,19 +4,75 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smart Wellness Wearable</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=static_version) }}">
+  <script src="{{ url_for('static', filename='theme.js', v=static_version) }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v=static_version) }}" defer></script>
 </head>
-<body>
-  <header>
-    <strong>Smart Wellness Wearable</strong>
+<body class="{% block page %}app{% endblock %}">
+  <div class="band" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+  <!-- Inline icon set (no external files) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#0e7490"/></linearGradient>
+      <linearGradient id="g-screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#123b47"/><stop offset="1" stop-color="#0a2229"/></linearGradient>
+    </defs>
+    <symbol id="art-watch" viewBox="0 0 220 260">
+      <rect x="70" y="0" width="80" height="62" rx="16" fill="#0f3d4a"/><rect x="70" y="198" width="80" height="62" rx="16" fill="#0f3d4a"/>
+      <rect x="78" y="8" width="64" height="8" rx="4" fill="#1d5a6b"/><rect x="78" y="244" width="64" height="8" rx="4" fill="#1d5a6b"/>
+      <rect x="32" y="44" width="156" height="172" rx="44" fill="#0b2530"/>
+      <rect x="44" y="56" width="132" height="148" rx="34" fill="url(#g-screen)"/>
+      <rect x="188" y="100" width="10" height="34" rx="5" fill="#1d5a6b"/>
+      <path class="beat" d="M110 112c-9-12-28-6-26 9 2 12 26 26 26 26s24-14 26-26c2-15-17-21-26-9z" fill="#fb7185"/>
+      <polyline class="scan" pathLength="100" points="54,170 82,170 90,158 98,184 106,150 114,170 166,170" fill="none" stroke="#5eead4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="54,170 82,170 90,158 98,184 106,150 114,170 166,170" fill="none" stroke="#5eead4" stroke-opacity=".18" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart_rate" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9.2C1.6 7.2 4 4 7.2 4c2 0 3.4 1.1 4.8 2.8C13.4 5.1 14.8 4 16.8 4 20 4 22.4 7.2 21 10.8 19 15.6 12 20 12 20z" fill="currentColor"/><path d="M6 11h3l1.5-2.5 2 5 1.5-2.5h4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-steps" viewBox="0 0 24 24"><g fill="currentColor"><ellipse cx="8" cy="7" rx="3" ry="4.2"/><ellipse cx="16" cy="12" rx="3" ry="4.2"/><rect x="5.6" y="12.4" width="4.8" height="3" rx="1.5"/><rect x="13.6" y="17.4" width="4.8" height="3" rx="1.5"/></g></symbol>
+    <symbol id="i-sleep" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/><path d="M15 4h4l-4 4h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-alerts" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6z" fill="currentColor"/><circle cx="12" cy="19.5" r="2" fill="currentColor"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5z" fill="currentColor"/></symbol>
+    <symbol id="i-watch" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1" fill="currentColor" opacity=".55"/><rect x="8" y="18" width="8" height="4" rx="1" fill="currentColor" opacity=".55"/><rect x="5" y="5" width="14" height="14" rx="4" fill="currentColor"/><path d="M8 12h2l1-2 2 4 1-2h2" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M3 11 21 3l-8 18-2-8z" fill="currentColor"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3z" fill="currentColor" opacity=".35"/><path d="M3 13h5l1.5 2.5h5L16 13h5v6H3z" fill="currentColor"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" fill="currentColor"/><path d="M2 19c0-3.5 3-5.5 7-5.5s7 2 7 5.5z" fill="currentColor"/><circle cx="17" cy="9" r="2.8" fill="currentColor" opacity=".55"/><path d="M15.5 13.6c3.6-.4 6.5 1.4 6.5 4.9h-4.6" fill="currentColor" opacity=".55"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="currentColor" opacity=".35"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z" fill="currentColor"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3" fill="currentColor"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" fill="currentColor"/><path d="m4 7 8 6 8-6" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1.8"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6h16M9 6V4h6v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 8h12l-1 12H7z" fill="currentColor"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" fill="currentColor"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></g></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><rect x="3" y="13" width="4" height="8" rx="1.5" fill="currentColor" opacity=".55"/><rect x="10" y="8" width="4" height="13" rx="1.5" fill="currentColor" opacity=".75"/><rect x="17" y="3" width="4" height="18" rx="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 1.5-5 3-6 0 2 1 3.5 2.5 4C11 9 10.5 5.5 12 2z" fill="currentColor"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="logo"><svg width="22" height="22"><use href="#i-pulse"/></svg></span>
+      <span class="brand-text"><strong>Smart Wellness Wearable</strong><small>Your health data, shared on your terms</small></span>
+    </a>
+    <div class="top-right">
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch light or dark mode" title="Light / dark mode">
+      <svg class="sun" width="18" height="18"><use href="#i-sun"/></svg><svg class="moon" width="18" height="18"><use href="#i-moon"/></svg>
+    </button>
     {% if g.user_id %}
-    <form method="post" action="/logout" class="inline"><button>Log out</button></form>
+    <nav class="iconbar" aria-label="Main">
+      {% for href, icon, label in [("/", "home", "Dashboard"), ("/trends", "trend", "Health details"), ("/device", "watch", "My device"), ("/contacts", "users", "Trusted contacts"), ("/shared", "eye", "Shared with me"), ("/account", "user", "Account")] %}
+      <a href="{{ href }}" class="nav-ico{{ ' on' if request.path == href or (href == '/shared' and request.path.startswith('/wearers/')) }}" aria-label="{{ label }}"><svg width="20" height="20"><use href="#i-{{ icon }}"/></svg><span class="lbl">{{ label }}</span></a>
+      {% endfor %}
+      <form method="post" action="/logout" class="inline"><input type="hidden" name="csrf_token" value="{{ g.csrf_token }}"><button class="ghost">Log out</button></form>
+    </nav>
     {% endif %}
+    </div>
   </header>
   <main>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    {% if message %}<p class="message">{{ message }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    {% if message %}<p class="message" role="status">{{ message }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="foot"><svg class="ico" width="14" height="14"><use href="#i-shield"/></svg> Health readings are stored encrypted and shown only to the contacts you choose.</footer>
 </body>
 </html>
