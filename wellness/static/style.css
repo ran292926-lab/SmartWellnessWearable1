@@ -511,3 +511,4 @@ a.stat:hover { transform: translateY(-4px); box-shadow: 0 22px 36px -12px var(--
 .stat small { color: inherit; }
 a.stat, [data-theme="dark"] a.stat { color: #fff; }
 @media (max-width: 560px) { .stat { padding: 16px; } .stat strong { font-size: 1.7rem; } .stat .unit { margin-left: 3px; font-size: .8rem; } }
+   [data-theme="dark"] .mini.on { background: linear-gradient(135deg, var(--c), var(--c2)); color: #fff; }
