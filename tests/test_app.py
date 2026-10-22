@@ -636,6 +636,17 @@ class AppTest(unittest.TestCase):
         self.assertEqual(r.status_code, 401)
         self.assertEqual(spy.call_count, 1)          # an Argon2id check also runs for an unknown email
 
+    def test_locked_account_login_does_password_work(self):                     # F2
+        from unittest import mock
+        c = self.client()
+        self.register(c)
+        for _ in range(5):
+            self.login(c, password="wrong-password")
+        with mock.patch("wellness.crypto.verify_password", wraps=crypto.verify_password) as spy:
+            r = self.login(c)                       # correct password, but the account is locked
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(spy.call_count, 1)         # the same Argon2id check runs for a locked account
+
     def test_future_timestamp_rejected(self):                                    # F4
         c = self.client()
         self.register(c)
@@ -665,8 +676,10 @@ class AppTest(unittest.TestCase):
 
     def test_rate_limit_forgets_old_addresses(self):                             # F8
         from wellness import ratelimit
-        ratelimit._requests["198.51.100.9"].append(0.0)        # last request long ago
-        ratelimit._last_sweep = 0.0
+        import time
+        old = time.monotonic() - 120                            # two minutes ago
+        ratelimit._requests["198.51.100.9"].append(old)         # last request long ago
+        ratelimit._last_sweep = old
         self.client().get("/login")
         self.assertNotIn("198.51.100.9", ratelimit._requests)
 

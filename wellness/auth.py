@@ -85,6 +85,7 @@ def login():
 
     # SR7: blocked for 15 minutes after 5 consecutive failures
     if user["locked_until"] and datetime.fromisoformat(user["locked_until"]) > datetime.now(timezone.utc):
+        crypto.verify_password(password, user["password_hash"])   # F2: same Argon2id work; result ignored
         audit.log("failed_login", "locked", user["id"])
         return render_template("login.html", error=LOGIN_ERROR), 401
 
