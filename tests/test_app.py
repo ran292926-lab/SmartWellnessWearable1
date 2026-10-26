@@ -623,6 +623,9 @@ class AppTest(unittest.TestCase):
         r = a.post("/invitations", data={"contact_id": user_b["contact_id"], "csrf_token": token})
         self.assertEqual(r.status_code, 302)
         self.assertEqual(len(self.sql("SELECT * FROM invitations")), 1)
+        for bad in ("é" * 64, "<script>", "A" * 64, "0" * 65):                          # wrong format: 403, not 500
+            r = a.post("/invitations", data={"contact_id": user_b["contact_id"], "csrf_token": bad})
+            self.assertEqual(r.status_code, 403)
         self.assertEqual(a.post("/logout").status_code, 403)                          # logout needs the token too
         events = [r["event_type"] for r in self.sql("SELECT event_type FROM audit_log")]
         self.assertIn("csrf_failure", events)

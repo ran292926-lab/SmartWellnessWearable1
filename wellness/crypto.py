@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import os
+import re
 import secrets
 from pathlib import Path
 
@@ -75,7 +76,11 @@ def csrf_token(session_hash):
 
 
 def csrf_valid(session_hash, token):
-    return bool(token) and hmac.compare_digest(csrf_token(session_hash), token)
+    # Only a 64-character hex string can be a valid token; anything else (including
+    # non-ASCII text, which compare_digest cannot compare) is refused before the comparison.
+    if not isinstance(token, str) or not re.fullmatch(r"[0-9a-f]{64}", token):
+        return False
+    return hmac.compare_digest(csrf_token(session_hash), token)
 
 
 def encrypt(value):
