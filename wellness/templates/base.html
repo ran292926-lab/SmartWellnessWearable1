@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Smart Wellness Wearable</title>
+  <title>Sanad · Smart Wellness Wearable</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=static_version) }}">
   <script src="{{ url_for('static', filename='theme.js', v=static_version) }}"></script>
   <script src="{{ url_for('static', filename='app.js', v=static_version) }}" defer></script>
@@ -51,8 +52,8 @@
 
   <header class="topbar">
     <a class="brand" href="/">
-      <span class="logo"><svg width="22" height="22"><use href="#i-pulse"/></svg></span>
-      <span class="brand-text"><strong>Smart Wellness Wearable</strong><small>Your health data, shared on your terms</small></span>
+      <span class="logo sanad"><img src="{{ url_for('static', filename='sanad-mark.png', v=static_version) }}" width="40" height="40" alt=""></span>
+      <span class="brand-text"><strong>Sanad <span class="ar" lang="ar">سند</span></strong><small>Smart Wellness Wearable</small></span>
     </a>
     <div class="top-right">
     <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch light or dark mode" title="Light / dark mode">
