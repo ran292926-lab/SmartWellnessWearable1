@@ -26,7 +26,7 @@
   <label>Password <input type="password" name="password" minlength="8" maxlength="128" required></label>
   <label>Birth year <input type="number" name="birth_year" value="{{ form.birth_year if form }}" required></label>
   <label>Weight (kg) <input type="number" name="weight" step="0.1" value="{{ form.weight if form }}" required></label>
-  <label class="check"><input type="checkbox" name="privacy_consent" value="yes"> I accept the privacy notice</label>
+  <label class="check"><input type="checkbox" name="privacy_consent" value="yes"> I accept the <a href="/privacy" target="_blank" rel="noopener">privacy notice</a></label>
   <button>Create account</button>
 </form>
 <p>Already registered? <a href="/login">Log in</a></p>

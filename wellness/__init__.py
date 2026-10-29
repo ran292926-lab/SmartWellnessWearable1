@@ -31,11 +31,12 @@ def create_app(overrides=None):
     app.before_request(check_csrf)               # F1
     app.teardown_appcontext(db.close_db)
 
-    from . import account, api, auth, pages
+    from . import account, api, auth, pages, privacy
     app.register_blueprint(auth.bp)
     app.register_blueprint(pages.bp)
     app.register_blueprint(api.bp)
     app.register_blueprint(account.bp)
+    app.register_blueprint(privacy.bp)                # PR15-PR19
 
     # SR19: error messages without stack traces, database details or file paths
     @app.errorhandler(HTTPException)

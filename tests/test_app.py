@@ -695,5 +695,64 @@ class AppTest(unittest.TestCase):
         r.close()
 
 
+    # ---- Week 10: PR15-PR19 ----
+
+    def test_privacy_notice_is_public_and_linked(self):
+        c = self.client()
+        r = c.get("/privacy")                                                       # PR15: no login needed
+        html = r.get_data(as_text=True)
+        self.assertEqual(r.status_code, 200)
+        for text in ("Data we collect and why", "Who can see it", "How long we keep it", "90 days", "Your rights"):
+            self.assertIn(text, html)                                               # PR15
+        self.assertIn('href="/privacy"', c.get("/register").get_data(as_text=True))       # PR16
+        self.assertIn('href="/privacy"', c.get("/login").get_data(as_text=True))          # PR16
+        self.register(c)
+        self.login(c)
+        for page in ("/", "/trends", "/device", "/contacts", "/shared", "/account", "/my-data"):
+            self.assertIn('href="/privacy"', c.get(page).get_data(as_text=True), page)  # PR16
+
+    def test_my_data_shows_only_own_data(self):
+        self.assertEqual(self.client().get("/my-data").status_code, 401)            # SR11
+        c, sara = self.new_user("Sara", "sara@example.com")
+        device_id, token = self.device(c)
+        self.send(c, device_id, token, "heart_rate", 77)
+        other, omar = self.new_user("Omar", "omar@example.com")
+        self.link(c, other, "omar@example.com")
+        html = c.get("/my-data").get_data(as_text=True)
+        for text in ("sara@example.com", sara["contact_id"], device_id, "Version 1.0", "Omar", "77.0"):
+            self.assertIn(text, html)                                               # PR17
+        self.assertNotIn(omar["contact_id"], html)                                  # PR11
+        self.assertNotIn("omar@example.com", html)
+
+    def test_download_has_own_data_without_secrets(self):
+        import json
+        c, sara = self.new_user("Sara", "sara@example.com")
+        device_id, token = self.device(c)
+        self.send(c, device_id, token, "steps", 1200)
+        self.send(c, device_id, token, "sleep", 7.5)
+        other, omar = self.new_user("Omar", "omar@example.com")
+        inv = self.link(c, other, "omar@example.com")
+        c.post(f"/contacts/{inv}/categories", data={"category": ["steps"]})
+        r = c.get("/my-data/download")
+        self.assertIn("attachment", r.headers["Content-Disposition"])               # PR18
+        self.assertEqual(r.mimetype, "application/json")
+        body = r.get_data(as_text=True)
+        data = json.loads(body)
+        self.assertEqual(data["profile"]["email"], "sara@example.com")              # PR18
+        self.assertEqual(data["profile"]["contact_id"], sara["contact_id"])
+        self.assertEqual(data["profile"]["device_id"], device_id)
+        self.assertEqual(data["profile"]["privacy_notice"]["version"], "1.0")
+        self.assertEqual(data["trusted_contacts"],
+                         [{"display_name": "Omar", "status": "accepted", "shared_categories": ["Daily step summary"]}])
+        self.assertEqual(sorted(x["type"] for x in data["readings"]), ["sleep", "steps"])
+        session = self.sql("SELECT id FROM sessions WHERE user_id = ?", (sara["id"],))[0]["id"]
+        for secret in (sara["password_hash"], "correct-horse", token, crypto.hash_token(token), session,
+                       c.get_cookie("session_id").value, omar["contact_id"], "omar@example.com"):
+            self.assertNotIn(secret, body)                                          # PR19
+        events = [x["event_type"] for x in self.sql("SELECT event_type FROM audit_log")]
+        self.assertIn("data_export", events)                                        # SR21
+        self.assertEqual(self.client().get("/my-data/download").status_code, 401)  # SR11
+
+
 if __name__ == "__main__":
     unittest.main()

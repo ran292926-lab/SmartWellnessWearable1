@@ -215,6 +215,13 @@
   }
 
   // ---- Light / dark mode switch ----
+  // My data: changing the day reloads the readings for that day
+  function autosubmit() {
+    document.querySelectorAll('select[data-autosubmit]').forEach(function (sel) {
+      sel.addEventListener('change', function () { sel.form.submit(); });
+    });
+  }
+
   function themeToggle() {
     var root = document.documentElement;
     document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
@@ -234,6 +241,6 @@
     document.documentElement.classList.add("js");
     greet(); tick(); setInterval(tick, 15000);
     document.querySelectorAll("[data-count]").forEach(countUp);
-    themeToggle(); copyButtons(); notices(); passwords(); counters(); previews(); tooltips(); reveal(); tilt(); buttons();
+    autosubmit(); themeToggle(); copyButtons(); notices(); passwords(); counters(); previews(); tooltips(); reveal(); tilt(); buttons();
   });
 })();

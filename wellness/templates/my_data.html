@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <p class="eyebrow">Your rights</p>
+  <h1>My data</h1>
+  <p class="lead">Everything the app keeps about you. Correct it in My account; download a copy below.</p>
+</div>
+<div class="doc">
+
+<section>
+  <h2><span class="tile t-teal"><svg width="18" height="18"><use href="#i-inbox"/></svg></span>Download a copy</h2>
+  <p>A JSON file with your profile, device, privacy-notice acceptance, trusted contacts, readings and alerts. It does not contain passwords, tokens or other people's data, except the display names of your contacts.</p>
+  <a class="button" href="/my-data/download">Download my data</a>
+</section>
+
+<div class="columns">
+<div class="col">
+<section>
+  <h2><span class="tile t-blue"><svg width="18" height="18"><use href="#i-user"/></svg></span>Profile</h2>
+  <table>
+    <tr><th>Display name</th><td>{{ profile.display_name }}</td></tr>
+    <tr><th>Email</th><td>{{ profile.email }}</td></tr>
+    <tr><th>Birth year</th><td>{{ profile.birth_year }}</td></tr>
+    <tr><th>Weight</th><td>{{ profile.weight_kg }} kg</td></tr>
+    <tr><th>Contact ID</th><td><code>{{ profile.contact_id }}</code></td></tr>
+    <tr><th>Device ID</th><td>{% if profile.device_id %}<code>{{ profile.device_id }}</code>{% else %}None{% endif %}</td></tr>
+    <tr><th>Privacy notice</th><td>Version {{ profile.privacy_notice.version }}, accepted {{ accepted }} (Riyadh)</td></tr>
+  </table>
+  <p><a class="more" href="/account">Correct in My account <svg class="ico" width="14" height="14"><use href="#i-arrow"/></svg></a></p>
+</section>
+</div>
+<div class="col">
+<section>
+  <h2><span class="tile t-red"><svg width="18" height="18"><use href="#i-users"/></svg></span>Trusted contacts</h2>
+  {% if contacts %}
+  <table>
+    <tr><th>Contact</th><th>Status</th><th>Can see</th></tr>
+    {% for c in contacts %}<tr><td>{{ c.display_name }}</td><td>{{ c.status }}</td><td>{{ c.shared_categories | join(", ") or "Nothing" }}</td></tr>{% endfor %}
+  </table>
+  {% else %}<p class="hint">None.</p>{% endif %}
+</section>
+<section>
+  <h2><span class="tile t-amber"><svg width="18" height="18"><use href="#i-alerts"/></svg></span>Alerts</h2>
+  {% if alerts %}<ul>{% for a in alerts %}<li>{{ a.created_at_utc[:16] | replace("T", " ") }} UTC: {{ a.alert }}</li>{% endfor %}</ul>{% else %}<p class="hint">None.</p>{% endif %}
+</section>
+</div>
+</div>
+
+<section>
+  <h2><span class="tile t-indigo"><svg width="18" height="18"><use href="#i-trend"/></svg></span>Readings</h2>
+  <p>Stored: {% for t, name in types.items() %}{{ name.split(" (")[0] }} {{ counts[t] }}{{ ", " if not loop.last }}{% endfor %} readings, kept for 90 days.</p>
+  {% if days %}
+  <form method="get" action="/my-data" class="inline-form">
+    <label>Day <select name="day" data-autosubmit>{% for d in days %}<option value="{{ d }}"{{ " selected" if d == day }}>{{ d }}</option>{% endfor %}</select></label>
+    <noscript><button>Show</button></noscript>
+  </form>
+  <div class="table-wrap scroll">
+  <table>
+    <tr><th>Time (Riyadh)</th><th>Type</th><th>Value</th></tr>
+    {% for r in readings %}<tr><td>{{ r.recorded_at_riyadh[11:] }}</td><td>{{ types[r.type] }}</td><td>{{ r.value }}</td></tr>{% endfor %}
+  </table>
+  </div>
+  {% else %}<p class="hint">No readings yet.</p>{% endif %}
+</section>
+
+</div>
+{% endblock %}

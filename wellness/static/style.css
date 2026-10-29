@@ -511,4 +511,16 @@ a.stat:hover { transform: translateY(-4px); box-shadow: 0 22px 36px -12px var(--
 .stat small { color: inherit; }
 a.stat, [data-theme="dark"] a.stat { color: #fff; }
 @media (max-width: 560px) { .stat { padding: 16px; } .stat strong { font-size: 1.7rem; } .stat .unit { margin-left: 3px; font-size: .8rem; } }
-   [data-theme="dark"] .mini.on { background: linear-gradient(135deg, var(--c), var(--c2)); color: #fff; }
+[data-theme="dark"] .mini.on { background: linear-gradient(135deg, var(--c), var(--c2)); color: #fff; }
+
+/* Week 10: privacy notice and My data */
+.doc section { margin-bottom: 22px; }
+.doc ul { padding-left: 20px; line-height: 1.6; }
+.table-wrap { overflow-x: auto; }
+.table-wrap.scroll { max-height: 420px; overflow-y: auto; }
+.doc th { white-space: nowrap; color: var(--muted); font-weight: 700; }
+.doc td a, .doc li a, .foot a { color: var(--teal); font-weight: 700; }
+.auth-page .foot a, .check a { color: inherit; text-decoration: underline; }
+.inline-form { display: flex; gap: 10px; align-items: end; margin: 6px 0 10px; }
+.inline-form select { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card, #fff); color: var(--ink); font: inherit; }
+a.button, [data-theme="dark"] a.button, section a.button { color: #fff; }
