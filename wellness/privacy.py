@@ -44,6 +44,19 @@ def _profile(me):
     }
 
 
+def _account(me):
+    """Account ID and login-block data (SR7), shown so the user sees everything kept about them (PR17)."""
+    return {"account_id": me["id"], "failed_login_count": me["failed_login_count"],
+            "locked_until_utc": me["locked_until"]}
+
+
+def _security_log():
+    """The user's own audit log entries: event, outcome and time only (SR22 keeps secrets out of the log)."""
+    rows = query_all("SELECT event_type, outcome, created_at FROM audit_log WHERE user_id = ? ORDER BY id",
+                     (str(g.user_id),))
+    return [{"event": r["event_type"], "outcome": r["outcome"], "time_utc": r["created_at"]} for r in rows]
+
+
 def _contacts():
     """The wearer's trusted contacts: display name, status and selected categories only (PR19)."""
     rows = query_all(
@@ -82,11 +95,13 @@ def my_data():
     all_readings = _readings()
     days = sorted({r["recorded_at_riyadh"][:10] for r in all_readings}, reverse=True)
     day = request.args.get("day")
-    if day not in days:
+    if day not in days:                      # only a day that exists in the user's own readings is used
         day = days[0] if days else None
     counts = {t: sum(1 for r in all_readings if r["type"] == t) for t in READING_TYPES}
     audit.log("sensitive_data_access", "success", g.user_id)                          # SR21
-    return render_template("my_data.html", profile=_profile(me), accepted=_riyadh(me["privacy_consent_time"]), contacts=_contacts(), alerts=_alerts(),
+    log = _security_log()
+    return render_template("my_data.html", profile=_profile(me), account=_account(me),
+                           log_count=len(log), log=log[-20:][::-1], accepted=_riyadh(me["privacy_consent_time"]), contacts=_contacts(), alerts=_alerts(),
                            days=days, day=day, counts=counts, types=READING_TYPES,
                            readings=[r for r in all_readings if r["recorded_at_riyadh"].startswith(day)] if day else [])
 
@@ -100,9 +115,11 @@ def download():
     export = {
         "exported_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "profile": _profile(me),
+        "account": _account(me),
         "trusted_contacts": _contacts(),
         "readings": [{k: r[k] for k in ("type", "value", "recorded_at_utc")} for r in _readings()],
         "alerts": _alerts(),
+        "security_log": _security_log(),
     }
     audit.log("data_export", "success", g.user_id)                                    # SR21
     body = json.dumps(export, indent=2, ensure_ascii=False)

@@ -530,3 +530,4 @@ a.button, [data-theme="dark"] a.button, section a.button { color: #fff; }
 .logo.sanad img { display: block; width: 40px; height: 40px; }
 .brand-text strong { font-size: 1.22rem; letter-spacing: .02em; }
 .brand-text strong .ar { font-weight: 700; opacity: .8; margin-left: 4px; font-size: .95em; }
+.table-wrap.scroll.short { max-height: 260px; }

@@ -702,7 +702,9 @@ class AppTest(unittest.TestCase):
         r = c.get("/privacy")                                                       # PR15: no login needed
         html = r.get_data(as_text=True)
         self.assertEqual(r.status_code, 200)
-        for text in ("Data we collect and why", "Who can see it", "How long we keep it", "90 days", "Your rights"):
+        for text in ("Data we collect and why", "Who can see it", "How long we keep it", "90 days", "Your rights",
+                     "Account ID", "Failed logins and login block", "Not stored", "(planned, not active yet)",
+                     "Your health data is shared only after they accept"):
             self.assertIn(text, html)                                               # PR15
         self.assertIn('href="/privacy"', c.get("/register").get_data(as_text=True))       # PR16
         self.assertIn('href="/privacy"', c.get("/login").get_data(as_text=True))          # PR16
@@ -719,10 +721,23 @@ class AppTest(unittest.TestCase):
         other, omar = self.new_user("Omar", "omar@example.com")
         self.link(c, other, "omar@example.com")
         html = c.get("/my-data").get_data(as_text=True)
-        for text in ("sara@example.com", sara["contact_id"], device_id, "Version 1.0", "Omar", "77.0"):
+        for text in ("sara@example.com", sara["contact_id"], device_id, "Version 1.0", "Omar", "77.0",
+                     "Account and security", "invitation_sent"):
             self.assertIn(text, html)                                               # PR17
+        self.assertIn(f"<code>{sara['id']}</code>", html)                           # account ID
         self.assertNotIn(omar["contact_id"], html)                                  # PR11
         self.assertNotIn("omar@example.com", html)
+
+    def test_my_data_day_parameter_is_safe(self):
+        c, sara = self.new_user("Sara", "sara@example.com")
+        device_id, token = self.device(c)
+        self.send(c, device_id, token, "heart_rate", 77)
+        for day in ("<script>alert(1)</script>", "' OR 1=1 --", "%", "2026-13-99", "x" * 5000):
+            r = c.get("/my-data", query_string={"day": day})
+            html = r.get_data(as_text=True)
+            self.assertEqual(r.status_code, 200, day)                               # no server error
+            self.assertNotIn("<script>alert(1)</script>", html)                     # SR25: not reflected
+            self.assertIn("77.0", html)                                             # falls back to the latest day
 
     def test_download_has_own_data_without_secrets(self):
         import json
@@ -742,6 +757,9 @@ class AppTest(unittest.TestCase):
         self.assertEqual(data["profile"]["contact_id"], sara["contact_id"])
         self.assertEqual(data["profile"]["device_id"], device_id)
         self.assertEqual(data["profile"]["privacy_notice"]["version"], "1.0")
+        self.assertEqual(data["account"]["account_id"], sara["id"])                # PR17, PR18
+        self.assertTrue(any(e["event"] == "login" for e in data["security_log"]))
+        self.assertTrue(all(set(e) == {"event", "outcome", "time_utc"} for e in data["security_log"]))  # PR19
         self.assertEqual(data["trusted_contacts"],
                          [{"display_name": "Omar", "status": "accepted", "shared_categories": ["Daily step summary"]}])
         self.assertEqual(sorted(x["type"] for x in data["readings"]), ["sleep", "steps"])

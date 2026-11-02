@@ -3,13 +3,13 @@
 <div class="page-head">
   <p class="eyebrow">Your rights</p>
   <h1>My data</h1>
-  <p class="lead">Everything the app keeps about you. Correct it in My account; download a copy below.</p>
+  <p class="lead">Your data as kept by the app. Passwords, tokens and session identifiers are never shown. Correct it in My account; download a copy below.</p>
 </div>
 <div class="doc">
 
 <section>
   <h2><span class="tile t-teal"><svg width="18" height="18"><use href="#i-inbox"/></svg></span>Download a copy</h2>
-  <p>A JSON file with your profile, device, privacy-notice acceptance, trusted contacts, readings and alerts. It does not contain passwords, tokens or other people's data, except the display names of your contacts.</p>
+  <p>A JSON file with your profile, device, privacy-notice acceptance, account and security data, trusted contacts, readings and alerts. It does not contain passwords, tokens or other people's data, except the display names of your contacts.</p>
   <a class="button" href="/my-data/download">Download my data</a>
 </section>
 
@@ -45,6 +45,22 @@
 </section>
 </div>
 </div>
+
+<section>
+  <h2><span class="tile t-teal"><svg width="18" height="18"><use href="#i-shield"/></svg></span>Account and security</h2>
+  <table>
+    <tr><th>Account ID</th><td><code>{{ account.account_id }}</code></td></tr>
+    <tr><th>Failed logins in a row</th><td>{{ account.failed_login_count }}</td></tr>
+    <tr><th>Login blocked until</th><td>{{ account.locked_until_utc or "Not blocked" }}</td></tr>
+  </table>
+  <p class="hint">Security log: {{ log_count }} entries about your account, kept for 365 days. The latest are shown; the download has all of them.</p>
+  <div class="table-wrap scroll short">
+  <table>
+    <tr><th>Time (UTC)</th><th>Event</th><th>Outcome</th></tr>
+    {% for e in log %}<tr><td>{{ e.time_utc[:16] | replace("T", " ") }}</td><td>{{ e.event }}</td><td>{{ e.outcome }}</td></tr>{% endfor %}
+  </table>
+  </div>
+</section>
 
 <section>
   <h2><span class="tile t-indigo"><svg width="18" height="18"><use href="#i-trend"/></svg></span>Readings</h2>
