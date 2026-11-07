@@ -315,6 +315,18 @@ class AppTest(unittest.TestCase):
         self.assertEqual(c.post(f"/contacts/{inv}/categories", data={"category": ["steps"]}).status_code, 403)
         self.assertEqual(self.sql("SELECT status FROM invitations")[0]["status"], "pending")
 
+    def test_contact_cannot_change_sharing(self):                                # Week 11 TC4
+        a, user_a = self.new_user("Sara", "sara@example.com")
+        b, user_b = self.new_user("Noura", "noura@example.com")
+        inv = self.link(a, b, "noura@example.com")                                   # accepted
+        a.post(f"/contacts/{inv}/categories", data={"category": ["steps"]})
+        before = dict(self.sql("SELECT * FROM invitations WHERE id = ?", (inv,))[0])
+        r = b.post(f"/contacts/{inv}/categories", data={"category": ["heart_rate", "steps", "sleep", "alerts"]})
+        self.assertEqual(r.status_code, 403)                                         # SR10, SR12
+        self.assertEqual(dict(self.sql("SELECT * FROM invitations WHERE id = ?", (inv,))[0]), before)   # PR4
+        self.assertEqual(b.post(f"/contacts/{inv}/remove").status_code, 403)
+        self.assertEqual(len(self.sql("SELECT * FROM invitations")), 1)
+
     # ---- SR15, SR19, SR25 ----
 
     def test_sql_injection_in_login_is_harmless(self):
