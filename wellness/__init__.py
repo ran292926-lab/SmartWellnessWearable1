@@ -5,7 +5,7 @@ import time
 from flask import Flask, render_template, request
 from werkzeug.exceptions import HTTPException
 
-from . import crypto, db, ratelimit, retention
+from . import crypto, db, headers, ratelimit, retention
 from .config import Config
 from .sessions import check_csrf, load_session
 
@@ -30,6 +30,7 @@ def create_app(overrides=None):
     app.before_request(load_session)
     app.before_request(check_csrf)               # F1
     app.teardown_appcontext(db.close_db)
+    app.after_request(headers.add)               # Week 12: W1-W5
 
     from . import account, api, auth, pages, privacy
     app.register_blueprint(auth.bp)

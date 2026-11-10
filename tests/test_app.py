@@ -784,5 +784,33 @@ class AppTest(unittest.TestCase):
         self.assertEqual(self.client().get("/my-data/download").status_code, 401)  # SR11
 
 
+    # ---- Week 12: security headers (W1-W5) ----
+
+    def test_security_headers_on_pages(self):
+        c, _ = self.new_user("Sara", "sara@example.com")
+        for page in ("/login", "/", "/trends", "/my-data", "/account", "/privacy"):
+            r = c.get(page)
+            h = r.headers
+            self.assertIn("frame-ancestors 'none'", h["Content-Security-Policy"], page)     # W1, W2
+            self.assertIn("script-src 'self'", h["Content-Security-Policy"], page)          # W1
+            self.assertEqual(h["X-Frame-Options"], "DENY", page)                          # W2
+            self.assertIn("max-age=", h["Strict-Transport-Security"], page)               # W3
+            self.assertEqual(h["X-Content-Type-Options"], "nosniff", page)                # W4
+            self.assertEqual(h["Cache-Control"], "no-store", page)                        # W5
+        self.assertEqual(c.get("/my-data/download").headers["Cache-Control"], "no-store")  # PR18 kept
+
+    def test_static_files_keep_cache_and_get_headers(self):
+        r = self.client().get("/static/style.css")
+        self.assertIn("max-age=3600", r.headers["Cache-Control"])                         # Phase 4 F9 kept
+        self.assertEqual(r.headers["X-Content-Type-Options"], "nosniff")                  # W4
+        r.close()
+
+    def test_api_responses_not_stored(self):
+        r = self.client().post("/api/readings", json={})                            # refused request
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.headers["Cache-Control"], "no-store")                          # W5
+        self.assertEqual(r.headers["X-Content-Type-Options"], "nosniff")                  # W4
+
+
 if __name__ == "__main__":
     unittest.main()
