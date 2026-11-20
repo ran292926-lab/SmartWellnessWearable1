@@ -1,103 +1,91 @@
-# Smart Wellness Wearable — Code Snapshot 1 (Week 8)
+# Sanad · Smart Wellness Wearable
 
-SW 341 · Group G3 · Section O53
+SW 341 Software Security Engineering · Group G3 · Section O53 · Topic T3
 
-Week 8 scope from the project brief: **authentication, roles, API and database**.
-All data is synthetic.
+Sanad is a prototype wellness system. A simulated wearable sends heart rate, steps and sleep
+readings to a Flask web application. The wearer sees a dashboard and 7-day trends and can share
+selected daily summaries with trusted contacts. All data is synthetic.
+
+Final code: commit "Week 12: security headers (W1-W5)". The full project report (Phases 1–7)
+describes the requirements, design, threat model, tests and fixes.
+
+## Requirements
+
+- Python 3.10 or newer
+- Libraries with fixed versions in `requirements.txt` (Flask 3.1.3, Werkzeug 3.1.9,
+  Jinja2 3.1.6, cryptography 50.0.2)
 
 ## Run
 
 ```bash
-pip install -r requirements.txt
-python app.py                      # open https://localhost:5050/register
+python3 -m pip install -r requirements.txt
+python3 app.py                     # then open https://localhost:5050/register
 ```
 
-The server uses HTTPS with a self-signed certificate for localhost (SR16), created in
-`instance/` on first run. The browser shows a warning the first time: choose
-**Advanced → Proceed to localhost**.
+The server uses HTTPS on localhost only (SR16). The certificate is created in `instance/` on
+the first run; the browser asks you to accept it the first time
+(**Advanced → Proceed to localhost**).
 
-Simulated wearable (after you register a device on the home page):
+Settings are read from environment variables (`wellness/config.py`, NFR13, SR18):
+`DATABASE`, `DATA_KEY` or `KEY_FILE` (the AES key is kept outside the code and the database).
+
+## Simulated wearable
+
+Register a device on the **My device** page; the device ID and the secret token are shown once
+(SR28). Then:
 
 ```bash
-python simulator.py --device-id DEV-XXXXXXXX --token YOUR_TOKEN               # every 5 minutes (FR6)
-python simulator.py --device-id DEV-XXXXXXXX --token YOUR_TOKEN --interval 5  # faster, for a demo
+python3 simulator.py --device-id DEV-XXXXXXXX --token YOUR_TOKEN               # every 5 minutes (FR6)
+python3 simulator.py --device-id DEV-XXXXXXXX --token YOUR_TOKEN --interval 5  # faster, for a demo
 ```
 
-Tests:
+## Tests and checks
 
 ```bash
-python -m unittest -v
+python3 -m unittest -v                                   # 58 automated tests
+python3 -m coverage run -m unittest && python3 -m coverage report   # about 95% of wellness/
+python3 -m bandit -r wellness app.py simulator.py        # static analysis: no High findings
+python3 -m pip_audit -r requirements.txt                 # no known vulnerable libraries
 ```
+
+`coverage`, `bandit` and `pip-audit` are installed with `python3 -m pip install coverage bandit pip-audit`.
+The results are explained in Appendix A.9 of the report.
+
+## Features
+
+| Area | What it does | Requirements |
+|---|---|---|
+| Accounts | Register with consent, log in, log out, change email or password, delete the account | FR1–FR5, PR1, PR2, PR13 |
+| Device | Register or replace the simulated wearable; readings sent with a secret token | FR6, FR7, SR9, SR28 |
+| Dashboard | Current heart rate, steps, sleep, calories; health details and 7-day trends | FR8–FR13 |
+| Sharing | Invite by contact ID, accept or decline, choose the categories each contact sees | FR17–FR24, PR3–PR7, PR10, PR20 |
+| Privacy | Privacy notice on every page, My data view and JSON download | PR15–PR19 |
+| Retention | Invitations, readings and logs deleted after their retention period | PR5, PR6, PR12, SR23 |
+
+Heart-rate alerts (FR14–FR16) are not implemented.
+
+## Security controls
+
+| Control | Where |
+|---|---|
+| Argon2id password hashes; AES-256-GCM for health and profile values; SHA-256 hashes for session IDs and device tokens | `crypto.py` |
+| Server-side sessions (HttpOnly, Secure, SameSite=Lax), 30-minute idle timeout, CSRF token on the forms of logged-in users | `sessions.py` |
+| Login block after 5 failures, same message for every failed login | `auth.py` |
+| Access check on every request for the two roles (wearer, trusted contact) | `access.py` |
+| Server-side validation and parameterized queries | `validation.py`, `db.py` |
+| Request limit: 60 requests per minute per client IP, kept in memory only | `ratelimit.py`, `config.py` |
+| Security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Cache-Control) | `headers.py` |
+| Audit log without secrets or health values | `audit.py` |
+| Error pages without internal details; no IP addresses or versions in server output | `__init__.py`, `server.py` |
 
 ## Project structure
 
-| File | Contents |
+| Path | Contents |
 |---|---|
-| `app.py` | Starts the server |
-| `simulator.py` | Simulated wearable (FR6, FR7) |
-| `wellness/schema.sql` | Database tables |
-| `wellness/db.py` | Database access with parameterized queries |
-| `wellness/config.py` | Settings from environment variables |
-| `wellness/crypto.py` | Argon2id, AES-256, device-token and session-ID hashes, CSRF tokens, contact ID |
-| `wellness/sessions.py` | Server-side sessions, login check and CSRF check |
-| `wellness/validation.py` | Server-side input validation |
-| `wellness/auth.py` | Register, log in, log out |
-| `wellness/access.py` | Authorization check for the two roles |
-| `wellness/pages.py` | Dashboard, health details, device, invitations, data sharing |
-| `wellness/api.py` | Device readings API and wearer data API |
-| `wellness/data.py` | Dashboard values and daily summaries |
-| `wellness/audit.py` | Audit log |
-| `wellness/account.py` | Profile changes and account deletion |
-| `wellness/retention.py` | Retention rules |
-| `wellness/tls.py` | Local TLS certificate |
-| `wellness/ratelimit.py` | Request limit per client IP address, in memory only |
-| `wellness/server.py` | Web server output without client IP addresses or version numbers |
-| `wellness/templates/` | HTML pages |
-| `wellness/static/` | Style sheet and interface scripts (light/dark mode, copy buttons, chart tooltips) |
-| `tests/test_app.py` | Tests |
+| `app.py` | Starts the HTTPS server |
+| `simulator.py` | Simulated wearable |
+| `wellness/` | Application package (modules listed above, plus `pages.py`, `api.py`, `data.py`, `account.py`, `privacy.py`, `retention.py`, `tls.py`, `schema.sql`) |
+| `wellness/templates/`, `wellness/static/` | HTML pages, style sheet and scripts |
+| `tests/test_app.py` | 58 automated tests |
 
-## Requirements implemented in this snapshot
-
-| Area | Requirements | Where |
-|---|---|---|
-| Accounts | FR1, FR2, FR3, FR4, FR5 | `auth.py`, `account.py` |
-| Contact ID and invitations | FR17, FR18, FR19, FR20, FR21 | `auth.py`, `pages.py` |
-| Data sharing | FR22, FR23, FR24 | `pages.py`, `api.py`, `data.py` |
-| Device readings | FR6, FR7 | `api.py`, `simulator.py` |
-| Dashboard and charts | FR8, FR9, FR10, FR11, FR12, FR13 | `data.py`, `pages.py`, `home.html`, `trends.html` |
-| Authentication and sessions | SR1–SR9 | `crypto.py`, `sessions.py`, `auth.py`, `account.py`, `api.py` |
-| Authorization | SR10, SR11, SR12 | `access.py`, `sessions.py` |
-| Input validation | SR2, SR13, SR14, SR15 | `validation.py`, `db.py` |
-| Data protection | SR16, SR17, SR18, SR19, SR20 | `tls.py`, `crypto.py`, `config.py`, `__init__.py` |
-| Accountability | SR21–SR24, SR29 | `audit.py`, `access.py`, `retention.py` |
-| Output encoding | SR25 | templates (automatic HTML encoding) |
-| Added in Phase 3 | SR26, SR27, SR28, SR29, SR30, PR20 | `account.py`, `ratelimit.py`, `pages.py`, `home.html` |
-| Privacy | PR1–PR7, PR10–PR14 | `auth.py`, `pages.py`, `access.py`, `account.py`, `retention.py` |
-| Data quality | NFR4, NFR5, NFR7, NFR13 (database setting only; alert thresholds come with FR14) | `schema.sql`, `validation.py`, `data.py`, `config.py` |
-
-## Notes and limitations
-
-- **Retention (PR5, PR12, SR23):** the rules run once when the server starts and then at most
-  once an hour, triggered by an incoming request. They are not a separate scheduled job, so if
-  the server receives no requests, expired data stays until the next request.
-- **Privacy notice (PR15, PR16):** not written yet. The registration form already has the
-  consent box (PR1) and records the notice version and time (PR2), but the notice it refers to
-  is not available yet, so the privacy part is not complete in this snapshot.
-- **NFR4:** readings are unique per account, type and timestamp. Each account has one device,
-  so this is the same as per device ID while the device is not replaced.
-- **Device timestamps:** the device chooses the timestamp. No requirement limits it, so a
-  reading dated far in the future would never reach the 90-day limit (PR12). Recorded for review.
-- **Requirements added in Phase 3:** SR26–SR30 and PR20 were not in the Week 7 report; they
-  were added to the requirements in Phase 3 (Week 8).
-- **Audit log (SR24):** no user can change or delete log entries. The application itself
-  changes them in two defined cases only: entries older than 12 months are deleted (SR23), and
-  the user ID is replaced with a random ID when an account is deleted (PR14).
-- **Rate limit (SR27):** the per-IP counts are kept in memory only and are never stored or
-  logged (PR8), so they reset when the server restarts.
-- **CSRF:** not covered by the current requirements and not implemented; recorded for the
-  secure coding review.
-
-## Not in this snapshot (later weeks)
-
-- Dashboard, charts, calories and alerts: FR8–FR16, NFR1, NFR6, NFR8, NFR9
-- Privacy notice and user rights: PR15–PR19
+`instance/` (database, certificate) and `*.db` files are excluded from the repository by `.gitignore`.
